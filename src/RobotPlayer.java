@@ -38,11 +38,14 @@ public class RobotPlayer {
     static int rptx = 99; //rptx = recent paint tower x
     static int rpty = 99;
 
-    //type 0 is ruins type 1 is enemy tower
-    static int[] foundType = {};
-    //coords
-    static int[] foundx = {};
-    static int[] foundy = {};
+    //store the mapinfo objects for found things
+    static MapInfo[] found = {};
+
+    //when we start an exploration, we should start neer a paint tower and store it here
+    static MapInfo start;
+
+    //store all known freindly paint towers(in case of emergency)
+    static MapInfo[] towers = {};
 
     //this is our exploration goal, in exploration the goal will be to travel to these coords and find stuff along the way
     //this will be set randomly in the explorer function(obviously the distance will need to be within reach)
@@ -179,7 +182,7 @@ public class RobotPlayer {
      */
     public static void runSoldier(RobotController rc) throws GameActionException {
         // Sense information about all visible nearby tiles.
-        MapInfo[] nearbyTiles = rc.senseNearbyMapInfos();
+        //f
         //get our current location
         Maplocation currenLoc = rc.getLocation();
         //get our ammount of paint
@@ -188,7 +191,7 @@ public class RobotPlayer {
         //we are a builder/explorer
         if (type == 0) {
             //we havent set a goal yet
-            if(goalx == 99){
+            if (goalx == 99) {
                 //lets set a location
                 //
                 //wait how do we get current location
@@ -198,10 +201,10 @@ public class RobotPlayer {
             //we should coordinate
             //ok
             //just set a random goal coord and it will end up going in diff direcitons
-            
+
             MapInfo curRuin = null;
             for (MapInfo tile : nearbyTiles) {
-                
+
                 if (tile.hasRuin()) {
                     curRuin = tile;
                 }
@@ -217,7 +220,7 @@ public class RobotPlayer {
             //and just built on the ruin if the had enough paint
             //if not then they go back, replenish then return
             //ok yeah lets just have one type
-            a ruin
+
             if (curRuin != null) {
 
             }
@@ -270,6 +273,10 @@ public class RobotPlayer {
         if (!currentTile.getPaint().isAlly() && rc.canAttack(rc.getLocation())) {
             rc.attack(rc.getLocation());
         }
+    }
+
+    public static void runSplasher(RobotController rc) throws GameActionException {
+
     }
 
     /**
