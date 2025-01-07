@@ -1,0 +1,19 @@
+1. make towers sence thier surroundings and do either a single tile attack or area attack
+2. communication system? towers should rebroadcast messages
+3. Figure out how to sense surroundings? I think its auotmatic
+this creates an array nearbyTiles, with the nearby tiles
+MapInfo[] nearbyTiles = rc.senseNearbyMapInfos();
+we can iterate through this array and for each tile we can run any of the
+https://releases.battlecode.org/javadoc/battlecode25/1.0.0/battlecode/common/MapInfo.html
+options
+
+4. make some bots assigned as builders (soilders)o , should mark things to build and build based on markings
+5. Moppers go to nearby soldier/splashers/towers and pick up paint when convienient or low 
+6. splashers early game to connect towers
+7. everyone should read the default java code inside /src and make comments
+8. if an enemy is seen brodcast their location
+9. explorer/builder, goes out until find ruin or enemy tower, if enemy tower go back and report, if ruin then calculate, if we can build this and still make it back we should, we can also tell splashers to claim a line from a known tower to that one, if we cant we should go back, replenish, then build it(should we ask other builders to come too?, idk)
+
+10. Moppers to defend friendly towers and bring paint to support attacking forces
+11. splashers to claim land
+12. splashers to attack
