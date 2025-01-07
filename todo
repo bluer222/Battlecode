@@ -1,5 +1,9 @@
 1. make towers sence thier surroundings and do either a single tile attack or area attack
 2. communication system? towers should rebroadcast messages
+first digit is type of message then coords
+type 1 means found ruin and built tower(so a splasher should build a path there)
+type 2 means found ruin and didnt build tower(tells other builders nearby that they might want to go there)
+type 3 means need paint, so any moppers without a task should come and bring paint
 3. Figure out how to sense surroundings? I think its auotmatic
 this creates an array nearbyTiles, with the nearby tiles
 MapInfo[] nearbyTiles = rc.senseNearbyMapInfos();
@@ -15,5 +19,5 @@ options
 9. explorer/builder, goes out until find ruin or enemy tower, if enemy tower go back and report, if ruin then calculate, if we can build this and still make it back we should, we can also tell splashers to claim a line from a known tower to that one, if we cant we should go back, replenish, then build it(should we ask other builders to come too?, idk)
 
 10. Moppers to defend friendly towers and bring paint to support attacking forces
-11. splashers to claim land
+11. splashers to claim land, when a builder comes back we should paint a path between out location and the newly found tower
 12. splashers to attack
