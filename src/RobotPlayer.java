@@ -63,6 +63,9 @@ public class RobotPlayer {
     at turn ??? randomly some of these will set type to 2 and become soldiers  
      */
     static int type = rng.nextInt(2);
+
+    //were enemies seen last time we checked
+    static boolean enemiesNearby = false;
     /**
      * Array containing all the possible movement directions.
      */
@@ -147,7 +150,7 @@ public class RobotPlayer {
             } finally {
                 // Signify we've done everything we want to do, thereby ending our turn.
                 // This will make our code wait until the next turn, and then perform this loop again.
-                Clock.yield();
+                    Clock.yield();
             }
             // End of loop: go back to the top. Clock.yield() has ended, so it's time for another turn!
         }
@@ -164,11 +167,18 @@ public class RobotPlayer {
      */
     public static void runTower(RobotController rc) throws GameActionException {
         //if the turn is even
-        if (static int turnCount % 2 == 0){
+        if (static int turnCount % 2 == 0 || enemiesNearby){
+            //find enemies
             static RobotInfo[] nearbyEnemies = findEnemyRobots(rc);
-            if (nearbyEnemies.length != 0) {
-                rc.setIndicatorString("ENNEMIES!!!!");
-                
+            //are there any
+            if (nearbyEnemies.length == 0) {
+                //no enemies, we are safe
+                enemiesNearby = false;                
+            }else{
+                //there are enemies
+                //we set enemiesNearby to true so next turn we will check even if its an odd turn
+                enemiesNearby = true;
+                attackEnemies(rc, nearbyEnemies);
             }
             //if this is the first turn and this is a starting tower
             if(isOriginal && turnCount = 1){
@@ -335,9 +345,16 @@ public class RobotPlayer {
         // We can also move our code into different methods or classes to better organize it!
         updateEnemyRobots(rc);
     }
-    //my own version
-    //mathias, what are you doing
-    // i think you mean to put this in the tower funciton
+    //function for towers
+    //accepts robotcontroller and array of enemy robots
+    public static void findEnemyRobots(RobotController rc, RobotInfo[] enemies) throws GameActionException {
+        //if there is only one enemy then use sigle attack
+        if(enemies.length == 1){
+            
+        }
+    }
+
+    //returns an array of enemy robots
     public static void findEnemyRobots(RobotController rc) throws GameActionException {
         //find nearby robots
         static RobotInfo[] nearbyRobots = rc.senseNearbyRobots();
@@ -355,33 +372,7 @@ public class RobotPlayer {
         }
         return nearbyEnemies;
     }
-    public static void updateEnemyRobots(RobotController rc) throws GameActionException {
-        // Sensing methods can be passed in a radius of -1 to automatically 
-        // use the largest possible value.
-        //how tf does this work
-        //this has no readability
-        //wtf mit
-        RobotInfo[] enemyRobots = rc.senseNearbyRobots(-1, rc.getTeam().opponent());
-        //hey mathias
-        //i'm remaking this function right above here in findEnemyRobots
-        if (enemyRobots.length != 0) {
-            rc.setIndicatorString("There are nearby enemy robots! Scary!");
-            // Save an array of locations with enemy robots in them for possible future use.
-            MapLocation[] enemyLocations = new MapLocation[enemyRobots.length];
-            for (int i = 0; i < enemyRobots.length; i++) {
-                enemyLocations[i] = enemyRobots[i].getLocation();
-            }
-            RobotInfo[] allyRobots = rc.senseNearbyRobots(-1, rc.getTeam());
-            // Occasionally try to tell nearby allies how many enemy robots we see.
-            if (rc.getRoundNum() % 20 == 0) {
-                for (RobotInfo ally : allyRobots) {
-                    if (rc.canSendMessage(ally.location, enemyRobots.length)) {
-                        rc.sendMessage(ally.location, enemyRobots.length);
-                    }
-                }
-            }
-        }
-    }
+   
     //figure out the best direction to move given a destination and start
     public static Direction moveTowards(MapLocation currentLoc, MapLocation endLoc){
         Direction dir;
