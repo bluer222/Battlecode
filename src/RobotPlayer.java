@@ -450,4 +450,21 @@ public class RobotPlayer {
         } else {
             return Direction.CENTER;
         }
-    }
+
+        //Generates a random map location the farthest distance a player can move
+        //If all maps are square, you can merge x and y size
+        //This doesn't pythagorean theorem this just uses max side length of that triange
+        //I'll probably add pythagorean theorem to calculate that tomorrow
+        public static MapLocation setFarthest(MapLocation currentLoc, int maxDistance, int mapXSize, int mapYSize){
+            //generates a direction
+            int xmod = rand.nextInt(3)-1;
+            int ymod = rand.nextInt(3)-1;
+            //copies the location maybe
+            MapLocation newLoc = currentLoc;
+            //adds the (vector?) to our current location
+            MapLocation newLoc.x += (xmod * maxDistance);
+            MapLocation newLoc.y += (ymod * maxDistance);
+            //clamps the x and y to inside the map.
+            newLoc.x = clamp(newLoc.x, 0, mapXSize);
+            newLoc.y = clamp(newLoc.y, 0, mapYSize);
+        }
