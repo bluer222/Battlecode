@@ -384,40 +384,70 @@ public class RobotPlayer {
     //figure out the best direction to move given a destination and start
     public static Direction moveTowards(MapLocation currentLoc, MapLocation endLoc){
         Direction dir;
+        boolean picknext = false; 
         //check if it's right
-        if (endLoc.x > currentLoc.x){
+        if (endLoc.x > currentLoc.x || picknext){
             //check if it's up right
-            if (endLoc.y > currentLoc.y){
+            if (endLoc.y > currentLoc.y || picknext){
                 if (rc.canMove(Direction.NORTHEAST)){
                     return Direction.NORTHEAST;
+                } else {
+                    picknext = true;
                 }
             //if not it might be down right
-            } else if (endLoc.y < currentLoc.y) {
+            } 
+            if (endLoc.y < currentLoc.y || picknext) {
                 if (rc.canMove(Direction.SOUTHEAST)){
                     return Direction.SOUTHEAST;
+                }else {
+                    picknext = true;
                 }
             //if not then it's directly right
             } else {
                 if (rc.canMove(Direction.EAST)){
                     return Direction.EAST;
+                }else {
+                    picknext = true;
                 }
             }
         //alr bro it ain't that hard figure it out
-        } else if (endLoc.x < currentLoc.x){
-            if (endLoc.y > currentLoc.y){
+        } 
+        if (endLoc.x < currentLoc.x || picknext){
+            if (endLoc.y > currentLoc.y || picknext){
                 if (rc.canMove(Direction.NORTHWEST)){
                     return Direction.NORTHWEST;
+                }else {
+                    picknext = true;
                 }
-            } else if (endLoc.y < currentLoc.y) {
+            } 
+            if (endLoc.y < currentLoc.y || picknext) {
                 if (rc.canMove(Direction.SOUTHWEST)){
-                return Direction.SOUTHWEST;
+                    return Direction.SOUTHWEST;
+                }else {
+                    picknext = true;
+                }
             } else {
-                return Direction.WEST;
+                if (rc.canMove(Direction.WEST)){
+                    return Direction.WEST;
+                }else {
+                    picknext = true;
+                }
             }
-        } else if (endLoc.y > currentLoc.y) {
-            return Direction.UP;
-        } else{
-            return Direction.DOWN;
+        } 
+        if (endLoc.y > currentLoc.y || picknext) {
+            if (rc.canMove(Direction.UP)){
+                    return Direction.UP;
+                }else {
+                    picknext = true;
+                }
+        } 
+        if (endLoc.y > currentLoc.y || picknext){
+            if (rc.canMove(Direction.DOWN)){
+                    return Direction.DOWN;
+                }else {
+                    picknext = true;
+                }
+        } else {
+            return Direction.CENTER;
         }
-        
     }
