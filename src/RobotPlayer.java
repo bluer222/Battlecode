@@ -387,22 +387,24 @@ public class RobotPlayer {
         boolean picknext = false; 
         //check if it's right
         if (endLoc.x > currentLoc.x || picknext){
-            //check if it's up right
+            //is it also up
             if (endLoc.y > currentLoc.y || picknext){
+                //then move right+up
                 if (rc.canMove(Direction.NORTHEAST)){
                     return Direction.NORTHEAST;
                 } else {
+                    //we couldent move there
                     picknext = true;
                 }
-            //if not it might be down right
             } 
+            //maybe its right+down then
             if (endLoc.y < currentLoc.y || picknext) {
                 if (rc.canMove(Direction.SOUTHEAST)){
                     return Direction.SOUTHEAST;
                 }else {
                     picknext = true;
                 }
-            //if not then it's directly right
+            //if not then it's directly right(not up or down)
             } else {
                 if (rc.canMove(Direction.EAST)){
                     return Direction.EAST;
@@ -412,7 +414,9 @@ public class RobotPlayer {
             }
         //alr bro it ain't that hard figure it out
         } 
+        //either we're going left or none of the rights worked
         if (endLoc.x < currentLoc.x || picknext){
+            //are we going left up
             if (endLoc.y > currentLoc.y || picknext){
                 if (rc.canMove(Direction.NORTHWEST)){
                     return Direction.NORTHWEST;
@@ -420,6 +424,7 @@ public class RobotPlayer {
                     picknext = true;
                 }
             } 
+            //maybe left down
             if (endLoc.y < currentLoc.y || picknext) {
                 if (rc.canMove(Direction.SOUTHWEST)){
                     return Direction.SOUTHWEST;
@@ -427,6 +432,7 @@ public class RobotPlayer {
                     picknext = true;
                 }
             } else {
+                //ok we must be moving left then
                 if (rc.canMove(Direction.WEST)){
                     return Direction.WEST;
                 }else {
@@ -434,6 +440,8 @@ public class RobotPlayer {
                 }
             }
         } 
+        //we arent going left or right if we reached this point
+        //try up
         if (endLoc.y > currentLoc.y || picknext) {
             if (rc.canMove(Direction.UP)){
                     return Direction.UP;
@@ -441,6 +449,7 @@ public class RobotPlayer {
                     picknext = true;
                 }
         } 
+        //try down
         if (endLoc.y > currentLoc.y || picknext){
             if (rc.canMove(Direction.DOWN)){
                     return Direction.DOWN;
@@ -448,6 +457,7 @@ public class RobotPlayer {
                     picknext = true;
                 }
         } else {
+            //ok bro, we're already at the destination
             return Direction.CENTER;
         }
     }
