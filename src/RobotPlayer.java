@@ -74,8 +74,8 @@ public class RobotPlayer {
         Direction.SOUTH,
         Direction.SOUTHWEST,
         Direction.WEST,
-        Direction.NORTHWEST,};
-
+        Direction.NORTHWEST,
+    };
     /**
      * run() is the method that is called when a robot is instantiated in the
      * Battlecode world. It is like the main function for your robot. If this
@@ -206,6 +206,7 @@ public class RobotPlayer {
         }
 
         // TODO: can we attack other bots?
+    }
     }
 
     /**
@@ -444,20 +445,21 @@ public class RobotPlayer {
         //try up
         if (endLoc.y > currentLoc.y || picknext) {
             if (rc.canMove(Direction.UP)){
-                    return Direction.UP;
-                }else {
-                    picknext = true;
-                }
+                return Direction.UP;
+            }else {
+                picknext = true;
+            }
         } 
         //try down
         if (endLoc.y > currentLoc.y || picknext){
             if (rc.canMove(Direction.DOWN)){
-                    return Direction.DOWN;
-                }else {
-                    picknext = true;
-                }
+                return Direction.DOWN;
+            }else {
+                picknext = true;
+            }
         } else {
             //ok bro, we're already at the destination
             return Direction.CENTER;
         }
     }
+}
