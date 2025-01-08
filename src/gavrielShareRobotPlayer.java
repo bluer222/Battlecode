@@ -1,4 +1,3 @@
-
 package examplefuncsplayer;
 
 import battlecode.common.*;
@@ -15,12 +14,11 @@ import java.util.Set;
  * method inside this class is like your main function: this is what we'll call
  * once your robot is created!
  */
-
 public class RobotPlayer {
 
     /*
     This RNG to make some random
-    * moves. The Random class is provided by the java.util.Random import at the
+* moves. The Random class is provided by the java.util.Random import at the
      * top of this file. Here, we *seed* the RNG with a constant number (6147);
      * this makes sure we get the same sequence of numbers every time this code
      * is run. This is very useful for debugging!
@@ -54,15 +52,11 @@ public class RobotPlayer {
     static int goalx = 99;
     static int goaly = 99;
 
+    //Is the tower original (different behavior if so)
+    boolean isOriginalTower = false; 
     //movetowards function should be a boolg real life robots it seems li    /*
     //why whats a bool
     /*
-    type
-    starts at either 0 or 1
-    this makes it so that some soldiers are explorers and others are builders
-    at turn ??? randomly some of these will set type to 2 and become soldiers  
-     */
-    static int type = rng.nextInt(2);
     /**
      * Array containing all the possible movement directions.
      */
@@ -94,16 +88,15 @@ public class RobotPlayer {
 
         // You can also use indicators to save debug notes in replays.
         rc.setIndicatorString("Hello world!");
-        
-        //the first two towers behave diferently so this will check if the tower is original
-        static boolean isOriginal = false;
-        
-        if(rc.getRoundNum() == 1){
-            isOriginal = true;
-        }
+        //the starting towers behave differently than normally(produc) 2 soldiers and a splasher
 
-        static UnitType type = rc.getType();
-    
+rewl tonagiorihis is an check        }//the if statement and variable definiton 
+      //so this static int isOriginalTower;
+        if(rc.getRoundNum() == 1){
+            isOriginalTower = 1;
+        }else{
+            isOriginalTower
+        }
         while (true) {
             // This code runs during the entire lifespan of the robot, which is why it is in an infinite
             // loop. If we ever leave this loop and return from run(), the robot dies! At the end of the
@@ -154,37 +147,18 @@ public class RobotPlayer {
 
         // Your code should never reach here (unless it's intentional)! Self-destruction imminent...
     }
-    //this code runs for the two original towers
-    public static void runStartingTower(RobotController rc) throws GameActionException {
-    }
-        
-    /*
+    public static void
+    /**
      * Run a single turn for towers. This code is wrapped inside the infinite
      * loop in run(), so it is called once per turn.
      */
     public static void runTower(RobotController rc) throws GameActionException {
-        //if the turn is even
-        if (static int turnCount % 2 == 0){
-            static RobotInfo[] nearbyEnemies = findEnemyRobots(rc);
-            if (nearbyEnemies.length != 0) {
-                rc.setIndicatorString("ENNEMIES!!!!");
-                
-            }
-            //if this is the first turn and this is a starting tower
-            if(isOriginal && turnCount = 1){
-            if(type.isTowerType(LEVEL_ONE_MONEY_TOWER)){
-                //we are the money tower
-                //we need to make two soldiers
-            }
-            if(type.isTowerType(LEVEL_ONE_PAINT_TOWER)){
-                //we are the paint tower
-                //we need to make one splasher
-            }        
-        }
-        // Pick a direction to build in.
+        if()
+        // Pick a direction to build in randomly
         Direction dir = directions[rng.nextInt(directions.length)];
         //create a maplocation thats the currentlocation + direction
         MapLocation nextLoc = rc.getLocation().add(dir);
+        
         // Pick a random robot type to build.
         int robotType = rng.nextInt(3);
         //build it
@@ -214,17 +188,13 @@ public class RobotPlayer {
      */
     public static void runSoldier(RobotController rc) throws GameActionException {
         // Sense information about all visible nearby tiles.
-        //f
-        //get our current location
+        //fhttps://prod.liveshare.vsengsaas.visualstudio.com/join?C93EF0A96C485B437834922FED638D9FDEBE
         Maplocation currenLoc = rc.getLocation();
         //get our ammount of paint
         Maplocation currentPaint = rc.getPaint();
 
         //we are a builder/explorer
         if (type == 0) {
-           //what is this
-            //oh i thought it was for the explorers
-            //the eplorers need more complex code so when they move they check all of the tiles that are newly visable
             //we havent set a goal yet
             if (goalx == 99) {
                 //lets set a location
@@ -334,35 +304,11 @@ public class RobotPlayer {
         // We can also move our code into different methods or classes to better organize it!
         updateEnemyRobots(rc);
     }
-    //my own version
-    //mathias, what are you doing
-    // i think you mean to put this in the tower funciton
-    public static void findEnemyRobots(RobotController rc) throws GameActionException {
-        //find nearby robots
-        static RobotInfo[] nearbyRobots = rc.senseNearbyRobots();
 
-        //create an array, this will store enemies
-        static RobotInfo[] nearbyEnemies;
-        
-        int a = 0;
-        //go through each bot
-        for (int i = 0; i < nearbyRobots.length; i++) {
-            if(nearbyRobots[i].getTeam().opponent()){
-                nearbyEnemies[a] = nearbyRobots[i];
-                a++
-            }
-        }
-        return nearbyEnemies;
-    }
     public static void updateEnemyRobots(RobotController rc) throws GameActionException {
         // Sensing methods can be passed in a radius of -1 to automatically 
         // use the largest possible value.
-        //how tf does this work
-        //this has no readability
-        //wtf mit
         RobotInfo[] enemyRobots = rc.senseNearbyRobots(-1, rc.getTeam().opponent());
-        //hey mathias
-        //i'm remaking this function right above here in findEnemyRobots
         if (enemyRobots.length != 0) {
             rc.setIndicatorString("There are nearby enemy robots! Scary!");
             // Save an array of locations with enemy robots in them for possible future use.
@@ -381,43 +327,10 @@ public class RobotPlayer {
             }
         }
     }
-    //figure out the best direction to move given a destination and start
-    public static Direction moveTowards(MapLocation currentLoc, MapLocation endLoc){
-        Direction dir;
-        //check if it's right
-        if (endLoc.x > currentLoc.x){
-            //check if it's up right
-            if (endLoc.y > currentLoc.y){
-                if (rc.canMove(Direction.NORTHEAST)){
-                    return Direction.NORTHEAST;
-                }
-            //if not it might be down right
-            } else if (endLoc.y < currentLoc.y) {
-                if (rc.canMove(Direction.SOUTHEAST)){
-                    return Direction.SOUTHEAST;
-                }
-            //if not then it's directly right
-            } else {
-                if (rc.canMove(Direction.EAST)){
-                    return Direction.EAST;
-                }
-            }
-        //alr bro it ain't that hard figure it out
-        } else if (endLoc.x < currentLoc.x){
-            if (endLoc.y > currentLoc.y){
-                if (rc.canMove(Direction.NORTHWEST)){
-                    return Direction.NORTHWEST;
-                }
-            } else if (endLoc.y < currentLoc.y) {
-                if (rc.canMove(Direction.SOUTHWEST)){
-                return Direction.SOUTHWEST;
-            } else {
-                return Direction.WEST;
-            }
-        } else if (endLoc.y > currentLoc.y) {
-            return Direction.UP;
-        } else{
-            return Direction.DOWN;
+
+    public static Direction moveTowards(MapLocation currentLoc, MapLocation endLoc, RobotController rc){
+        if endLoc.x > currentLoc.x{
+            if endLoc.x 
         }
-        
     }
+}

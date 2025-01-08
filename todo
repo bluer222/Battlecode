@@ -29,3 +29,7 @@ type 3 means need paint, so any moppers without a task should come and bring pai
 8. if an enemy or enemy tower is seen brodcast their location
 
 13. create a system for only analyzing unanalyzed tiles
+14. towers check surroundings if the turn count is even, or if we saw one last time we checked
+15. robots store the last x and y value that they touched paint on
+
+since it seems like live share is broken should i just commit then we work throuh github?
