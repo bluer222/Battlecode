@@ -456,7 +456,7 @@ public class RobotPlayer {
         //This doesn't pythagorean theorem this just uses max side length of that triange
         //I'll probably add pythagorean theorem to calculate that tomorrow
         public static MapLocation setFarthest(MapLocation currentLoc, int maxDistance, int mapXSize, int mapYSize){
-            int sideLength = radius * 2;
+            int sideLength = maxDistance * 2;
             int x = currentLoc.x - maxDistance + random.nextInt(sideLength + 1);
             int y = currentLoc.y - maxDistance + random.nextInt(sideLength + 1);
 
