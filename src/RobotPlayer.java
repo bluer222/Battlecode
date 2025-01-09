@@ -52,8 +52,7 @@ public class RobotPlayer {
     static MapInfo[] towers = {};
 
     // we must define these variables here so they will be global
-    static int goalx = 99;
-    static int goaly = 99;
+    static MapLocation goal;
     static boolean isOriginal;
     static UnitType botType;
     static double attackRange;
@@ -307,53 +306,31 @@ public class RobotPlayer {
         // Sense information about all visible nearby tiles.
         // f
         // get our current location
-        Maplocation currenLoc = rc.getLocation();
+        MapLocation currenLoc = rc.getLocation();
         // get our ammount of paint
-        Maplocation currentPaint = rc.getPaint();
+        int currentPaint = rc.getPaint();
 
-        // we are a builder/explorer
-        if (type == 0) {
-            // what is this
-            // oh i thought it was for the explorers
-            // the eplorers need more complex code so when they move they check all of the
-            // tiles that are newly visable
+        // we dont have attacking code rn so we are an explorer
             // we havent set a goal yet
-            if (goalx == 99) {
+            if (goal == null) {
                 // lets set a location
-                //
+                //placeholder values, maxdistance 50 and mapsize max 
+                goal = setFarthest(currenLoc, 50, 60, 60);
+
                 // wait how do we get current location
                 // theres something on it in the documentation
             }
             // lets search our surriondings
-            // we should coordinate
-            // ok
-            // just set a random goal coord and it will end up going in diff direcitons
+           MapLocation[] ruins = rc.senseNearbyRuins(1000);
 
-            MapInfo curRuin = null;
-            for (MapInfo tile : nearbyTiles) {
-
-                if (tile.hasRuin()) {
-                    curRuin = tile;
-                }
-                if (tile.hasRuin()) {
-                    curRuin = tile;
-                }
-            }
-            // we found
-            // Search for a nearby ruin to complete.
-            // shouldnt we go to the coords that explorers send us
-            // so you want to just wait and waste time until we get an explorer
-            // what if the explorers were builders
-            // and just built on the ruin if the had enough paint
-            // if not then they go back, replenish then return
-            // ok yeah lets just have one type
-
-            if (curRuin != null) {
+            if(ruins.length > 0){
+                // we found
+                MapInfo closestRuin = null;
 
             }
-        } else if (type == 1) {
-            // we are a explorer
-
+            //now lets search for other robots(this should include towers i think)
+            // lets search our surriondings
+           MapLocation[] ruins = rc.senseNearbyRuins(1000);
         }
 
         // if we found a ruin
@@ -458,7 +435,7 @@ public class RobotPlayer {
     }
 
     // figure out the best direction to move given a destination and start
-    public static Direction moveTowards(MapLocation currentLoc, MapLocation endLoc) {
+    public static Direction moveTowards(RobotController rc,MapLocation currentLoc, MapLocation endLoc) {
         Direction dir;
         boolean picknext = false;
         // check if it's right
@@ -519,16 +496,16 @@ public class RobotPlayer {
         // we arent going left or right if we reached this point
         // try up
         if (endLoc.y > currentLoc.y || picknext) {
-            if (rc.canMove(Direction.UP)) {
-                return Direction.UP;
+            if (rc.canMove(Direction.NORTH)) {
+                return Direction.NORTH;
             } else {
                 picknext = true;
             }
         }
         // try down
         if (endLoc.y > currentLoc.y || picknext) {
-            if (rc.canMove(Direction.DOWN)) {
-                return Direction.DOWN;
+            if (rc.canMove(Direction.SOUTH)) {
+                return Direction.SOUTH;
             } else {
                 picknext = true;
             }
@@ -543,13 +520,13 @@ public class RobotPlayer {
     //I'll probably add pythagorean theorem to calculate that tomorrow
     public static MapLocation setFarthest(MapLocation currentLoc, int maxDistance, int mapXSize, int mapYSize){
         int sideLength = maxDistance * 2;
-        int x = currentLoc.x - maxDistance + random.nextInt(sideLength + 1);
-        int y = currentLoc.y - maxDistance + random.nextInt(sideLength + 1);
+        int x = currentLoc.x - maxDistance + rng.nextInt(sideLength + 1);
+        int y = currentLoc.y - maxDistance + rng.nextInt(sideLength + 1);
+        MapLocation newLoc = new MapLocation(x,y);
 
-        Maplocation newLoc = new MapLocation(x,y)
         //clamps the x and y to inside the map.
-        newLoc.x = clamp(newLoc.x, 0, mapXSize);
-        newLoc.y = clamp(newLoc.y, 0, mapYSize);
+        newLoc.x = Math.clamp(newLoc.x, 0, mapXSize);
+        newLoc.y = Math.clamp(newLoc.y, 0, mapYSize);
         return newLoc;
     }
 }
