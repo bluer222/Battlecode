@@ -546,8 +546,7 @@ public class RobotPlayer {
         int x = currentLoc.x - maxDistance + random.nextInt(sideLength + 1);
         int y = currentLoc.y - maxDistance + random.nextInt(sideLength + 1);
 
-        MapLocation newLoc.x = x;
-        MapLocation newLoc.y = y;
+        Maplocation newLoc = new MapLocation(x,y)
         //clamps the x and y to inside the map.
         newLoc.x = clamp(newLoc.x, 0, mapXSize);
         newLoc.y = clamp(newLoc.y, 0, mapYSize);
