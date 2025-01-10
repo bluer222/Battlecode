@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.Dictionary;
 
 /**
  * RobotPlayer is the class that describes your main robot strategy. The run()
@@ -581,5 +582,26 @@ public class RobotPlayer {
         y = Math.clamp(y, 0, mapYSize);
 
         return new MapLocation(x,y);
+    }
+
+    public static Message buildMessage(int type, MapLocation currentLoc, int id, int round){
+        Message message = new Message((type * 10000)+(currentLoc.x * 100)+currentLoc.y, id, round);
+        return message;
+    }
+
+    public static HashMap<String, Integer> parseMessage(Message message){
+        int bytes = message.getBytes();
+        int type = bytes/10000;
+        int xloc = (bytes/100)%100;
+        int yloc = bytes%100;
+
+        HashMap<String, Integer> messageData = new HashMap<String, Integer>() {{
+            put("type", type);
+            put("xloc", xloc);
+            put("yloc", yloc);
+            put("sender", message.getSenderID());
+            put("roundSent", message.getRound());
+        }};
+        return messageData;
     }
 }

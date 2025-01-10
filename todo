@@ -32,5 +32,3 @@ type 3 means need paint, so any moppers without a task should come and bring pai
 14. towers check surroundings if the turn count is even, or if we saw one last time we checked
 15. robots store the last x and y value that they touched paint on
 16. if towers build bots as soon as they can, we'll never save up enough chips to build more towers, either only build bots when chips > 1000 or make system for communicating that we need to save up
-
-since it seems like live share is broken should i just commit then we work throuh github?
