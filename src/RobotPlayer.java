@@ -119,13 +119,12 @@ public class RobotPlayer {
 
         botType = rc.getType();
 
-        if (botType.isRobotType(SPLASHER) || botType.isTowerType(LEVEL_ONE_MONEY_TOWER)
-                || botType.isTowerType(LEVEL_ONE_PAINT_TOWER)) {
+        if (botType == UnitType.SPLASHER || botType == UnitType.LEVEL_ONE_MONEY_TOWER|| botType == UnitType.LEVEL_ONE_PAINT_TOWER) {
             attackRange = 3;
-        } else if (botType.isRobotType(SOLDIER) || botType.isTowerType(LEVEL_ONE_DEFENSE_TOWER)) {
+        } else if (botType == UnitType.SOLDIER || botType == UnitType.LEVEL_ONE_DEFENSE_TOWER) {
             // sqrt 20
             attackRange = 4.4721;
-        } else if (botType.isRobotType(MOPPER)) {
+        } else if (botType == UnitType.MOPPER) {
             // sqrt 2
             attackRange = 1.4142;
         }
@@ -223,8 +222,8 @@ public class RobotPlayer {
             rc.attack(enemies[0].getLocation());
         } else {
             // find all the locations and distances
-            MapLocation[] locations;
-            int[] distance;
+            MapLocation[] locations = null;
+            int[] distance = null;
             for (int i = 0; i < enemies.length; i++) {
                 RobotInfo enemy = enemies[i];
                 locations[i] = enemy.getLocation();
@@ -261,11 +260,11 @@ public class RobotPlayer {
             }
             // if this is the first turn and this is a starting tower
             if (isOriginal && turnCount == 1) {
-                if (botType.isTowerType(LEVEL_ONE_MONEY_TOWER)) {
+                if (botType == UnitType.LEVEL_ONE_MONEY_TOWER) {
                     // we are the money tower
                     // we need to make two soldiers
                 }
-                if (botType.isTowerType(LEVEL_ONE_PAINT_TOWER)) {
+                if (botType == UnitType.LEVEL_ONE_PAINT_TOWER) {
                     // we are the paint tower
                     // we need to make one splasher
                 }
@@ -305,7 +304,61 @@ public class RobotPlayer {
     public static void runSoldier(RobotController rc) throws GameActionException {
         // Sense information about all visible nearby tiles.
         // f
+        MapLocation currenLoc = rc.getLocation();
         // get our current location
+        MapLocation[] ruins = rc.senseNearbyRuins(1000);
+        int[] distance = null;
+        for (int i = 0; i < ruins.length; i++) {
+            distance[i] = ruins[i].distanceSquaredTo(currenLoc);
+        }
+        MapLocation targetLoc = null;
+
+        // first, we'll do our single tile attack on the closest bot
+        targetLoc = ruins[getLowest(distance)];
+
+        if (targetLoc != null){
+            Direction dir = rc.getLocation().directionTo(targetLoc);
+            if (rc.canMove(dir))
+                rc.move(dir);
+            // Mark the pattern we need to draw to build a tower here if we haven't already.
+            MapLocation shouldBeMarked = targetLoc.subtract(dir);
+            if (rc.senseMapInfo(shouldBeMarked).getMark() == PaintType.EMPTY && rc.canMarkTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc)){
+                rc.markTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc);
+                System.out.println("Trying to build a tower at " + targetLoc);
+            }
+            // Fill in any spots in the pattern with the appropriate paint.
+            for (MapInfo patternTile : rc.senseNearbyMapInfos(targetLoc, 8)){
+                if (patternTile.getMark() != patternTile.getPaint() && patternTile.getMark() != PaintType.EMPTY){
+                    boolean useSecondaryColor = patternTile.getMark() == PaintType.ALLY_SECONDARY;
+                    if (rc.canAttack(patternTile.getMapLocation()))
+                        rc.attack(patternTile.getMapLocation(), useSecondaryColor);
+                }
+            }
+            // Complete the ruin if we can.
+            if (rc.canCompleteTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc)){
+                rc.completeTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc);
+                rc.setTimelineMarker("Tower built", 0, 255, 0);
+                System.out.println("Built a tower at " + targetLoc + "!");
+            }
+        }
+
+        // Move and attack randomly if no objective.
+        Direction dir = directions[rng.nextInt(directions.length)];
+        MapLocation nextLoc = rc.getLocation().add(dir);
+        if (rc.canMove(dir)){
+            rc.move(dir);
+        }
+        // Try to paint beneath us as we walk to avoid paint penalties.
+        // Avoiding wasting paint by re-painting our own tiles.
+        MapInfo currentTile = rc.senseMapInfo(rc.getLocation());
+        if (!currentTile.getPaint().isAlly() && rc.canAttack(rc.getLocation())){
+            rc.attack(rc.getLocation());
+        }
+
+
+        //new code isnt ready, dont run it
+        /* 
+        return;
         MapLocation currenLoc = rc.getLocation();
         // get our ammount of paint
         int currentPaint = rc.getPaint();
@@ -378,6 +431,7 @@ public class RobotPlayer {
         if (!currentTile.getPaint().isAlly() && rc.canAttack(rc.getLocation())) {
             rc.attack(rc.getLocation());
         }
+            */
     }
 
     public static void runSplasher(RobotController rc) throws GameActionException {
@@ -412,7 +466,7 @@ public class RobotPlayer {
         RobotInfo[] nearbyRobots = rc.senseNearbyRobots();
 
         // create an array, this will store enemies
-        RobotInfo[] nearbyEnemies;
+        RobotInfo[] nearbyEnemies = null;
 
         int a = 0;
         // go through each bot
@@ -509,10 +563,9 @@ public class RobotPlayer {
             } else {
                 picknext = true;
             }
-        } else {
-            // ok bro, we're already at the destination
-            return Direction.CENTER;
         }
+        // ok bro, we're already at the destination
+        return Direction.CENTER;
     }
     //Generates a random map location the farthest distance a player can move
     //If all maps are square, you can merge x and y size
@@ -522,11 +575,11 @@ public class RobotPlayer {
         int sideLength = maxDistance * 2;
         int x = currentLoc.x - maxDistance + rng.nextInt(sideLength + 1);
         int y = currentLoc.y - maxDistance + rng.nextInt(sideLength + 1);
-        MapLocation newLoc = new MapLocation(x,y);
 
         //clamps the x and y to inside the map.
-        newLoc.x = Math.clamp(newLoc.x, 0, mapXSize);
-        newLoc.y = Math.clamp(newLoc.y, 0, mapYSize);
-        return newLoc;
+        x = Math.clamp(x, 0, mapXSize);
+        y = Math.clamp(y, 0, mapYSize);
+
+        return new MapLocation(x,y);
     }
 }
