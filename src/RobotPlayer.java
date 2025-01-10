@@ -59,6 +59,11 @@ public class RobotPlayer {
     static double attackRange;
     static MapLocation location;
 
+    // bots queued to build for towers
+    // soldier=1 mopper=2 splasher=3
+    static int[] botQueue = null;
+    static Message[] messageQueue = null;
+
     // this is our exploration goal, in exploration the goal will be to travel to
     // these coords and find stuff along the way
     // this will be set randomly in the explorer function(obviously the distance
@@ -120,7 +125,8 @@ public class RobotPlayer {
 
         botType = rc.getType();
 
-        if (botType == UnitType.SPLASHER || botType == UnitType.LEVEL_ONE_MONEY_TOWER|| botType == UnitType.LEVEL_ONE_PAINT_TOWER) {
+        if (botType == UnitType.SPLASHER || botType == UnitType.LEVEL_ONE_MONEY_TOWER
+                || botType == UnitType.LEVEL_ONE_PAINT_TOWER) {
             attackRange = 3;
         } else if (botType == UnitType.SOLDIER || botType == UnitType.LEVEL_ONE_DEFENSE_TOWER) {
             // sqrt 20
@@ -225,16 +231,19 @@ public class RobotPlayer {
             // find all the locations and distances
             MapLocation[] locations = null;
             int[] distance = null;
+            // for each enemy
             for (int i = 0; i < enemies.length; i++) {
                 RobotInfo enemy = enemies[i];
+                // get enemy location
                 locations[i] = enemy.getLocation();
-                distance[i] = distanceBetween(locations[i].x, locations[i].y, location.x, location.y);
+                // get distance to us
+                distance[i] = locations[i].distanceSquaredTo(location);
             }
             // first, we'll do our single tile attack on the closest bot
             MapLocation closest = locations[getLowest(distance)];
             rc.attack(closest);
-            
-            //area is yet to be coded, just attack again
+
+            // area is yet to be coded, just attack again
             rc.attack(closest);
         }
     }
@@ -244,10 +253,19 @@ public class RobotPlayer {
      * loop in run(), so it is called once per turn.
      */
     public static void runTower(RobotController rc) throws GameActionException {
+        // Read incoming messages every turn
+        Message[] messages = rc.readMessages(-1);
+
+        for (Message m : messages) {
+            messageQueue[messageQueue.length] = m;
+            System.out.println("Tower received message: '#" + m.getSenderID() + " " + m.getBytes());
+        }
+
         // if the turn is even
         if (turnCount % 2 == 0 || enemiesNearby) {
+            bots nearbyBots = findNearbyBots(rc);
             // find enemies
-            RobotInfo[] nearbyEnemies = findEnemyRobots(rc);
+            RobotInfo[] nearbyEnemies = nearbyBots.enemies;
             // are there any
             if (nearbyEnemies.length == 0) {
                 // no enemies, we are safe
@@ -259,43 +277,60 @@ public class RobotPlayer {
                 enemiesNearby = true;
                 attackEnemies(rc, nearbyEnemies);
             }
-            // if this is the first turn and this is a starting tower
-            if (isOriginal && turnCount == 1) {
-                if (botType == UnitType.LEVEL_ONE_MONEY_TOWER) {
-                    // we are the money tower
-                    // we need to make two soldiers
-                }
-                if (botType == UnitType.LEVEL_ONE_PAINT_TOWER) {
-                    // we are the paint tower
-                    // we need to make one splasher
+
+            // also if the turn is even
+            // spread messages
+            RobotInfo[] nearbyAllies = nearbyBots.allies;
+            // for every nearby bot
+            for (RobotInfo ally : nearbyAllies) {
+                // send every message
+                for (Message m : messageQueue) {
+                    // only send if they are not the source(this will save some message sends)
+                    if (ally.getID() != m.getSenderID()) {
+                        rc.sendMessage(ally.getLocation(), m.getBytes());
+                    }
                 }
             }
+            // all sent, clear the queue
+            messageQueue = null;
+        }
+        // if this is the first turn and this is a starting tower
+        if (isOriginal && turnCount == 1) {
+            if (botType == UnitType.LEVEL_ONE_MONEY_TOWER) {
+                // we are the money tower
+                // we need to make two soldiers
+                botQueue[0] = 1;
+                botQueue[1] = 1;
+            }
+            if (botType == UnitType.LEVEL_ONE_PAINT_TOWER) {
+                // we are the paint tower
+                // we need to make one splasher
+                botQueue[0] = 3;
+            }
+        }
+        if (botQueue.length > 0) {
             // Pick a direction to build in.
             Direction dir = directions[rng.nextInt(directions.length)];
             // create a maplocation thats the currentlocation + direction
             MapLocation nextLoc = rc.getLocation().add(dir);
-            // Pick a random robot type to build.
-            int robotType = rng.nextInt(3);
-            // build it
-            if (robotType == 0 && rc.canBuildRobot(UnitType.SOLDIER, nextLoc)) {
+            if (botQueue[botQueue.length] == 1) {
                 rc.buildRobot(UnitType.SOLDIER, nextLoc);
                 System.out.println("BUILT A SOLDIER");
-            } else if (robotType == 1 && rc.canBuildRobot(UnitType.MOPPER, nextLoc)) {
+            } else if (botQueue[botQueue.length] == 2) {
                 rc.buildRobot(UnitType.MOPPER, nextLoc);
                 System.out.println("BUILT A MOPPER");
-            } else if (robotType == 2 && rc.canBuildRobot(UnitType.SPLASHER, nextLoc)) {
+            } else {
                 rc.buildRobot(UnitType.SPLASHER, nextLoc);
                 System.out.println("BUILT A SPLASHER");
             }
 
-            // Read incoming messages
-            Message[] messages = rc.readMessages(-1);
-            for (Message m : messages) {
-                System.out.println("Tower received message: '#" + m.getSenderID() + " " + m.getBytes());
-            }
-
-            // TODO: can we attack other bots?
         }
+        //finally, we add more bots to the queue if empty and enough chips
+        if(botQueue.length == 0 && rc.getMoney() - 1000 > 400 && rc.getPaint() >= 300){
+            botQueue[0] = rng.nextInt(3)+1;
+        }
+
+
     }
 
     /**
@@ -317,87 +352,12 @@ public class RobotPlayer {
         // first, we'll do our single tile attack on the closest bot
         targetLoc = ruins[getLowest(distance)];
 
-        if (targetLoc != null){
+        if (targetLoc != null) {
             Direction dir = rc.getLocation().directionTo(targetLoc);
             if (rc.canMove(dir))
                 rc.move(dir);
             // Mark the pattern we need to draw to build a tower here if we haven't already.
             MapLocation shouldBeMarked = targetLoc.subtract(dir);
-            if (rc.senseMapInfo(shouldBeMarked).getMark() == PaintType.EMPTY && rc.canMarkTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc)){
-                rc.markTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc);
-                System.out.println("Trying to build a tower at " + targetLoc);
-            }
-            // Fill in any spots in the pattern with the appropriate paint.
-            for (MapInfo patternTile : rc.senseNearbyMapInfos(targetLoc, 8)){
-                if (patternTile.getMark() != patternTile.getPaint() && patternTile.getMark() != PaintType.EMPTY){
-                    boolean useSecondaryColor = patternTile.getMark() == PaintType.ALLY_SECONDARY;
-                    if (rc.canAttack(patternTile.getMapLocation()))
-                        rc.attack(patternTile.getMapLocation(), useSecondaryColor);
-                }
-            }
-            // Complete the ruin if we can.
-            if (rc.canCompleteTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc)){
-                rc.completeTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc);
-                rc.setTimelineMarker("Tower built", 0, 255, 0);
-                System.out.println("Built a tower at " + targetLoc + "!");
-            }
-        }
-
-        // Move and attack randomly if no objective.
-        Direction dir = directions[rng.nextInt(directions.length)];
-        MapLocation nextLoc = rc.getLocation().add(dir);
-        if (rc.canMove(dir)){
-            rc.move(dir);
-        }
-        // Try to paint beneath us as we walk to avoid paint penalties.
-        // Avoiding wasting paint by re-painting our own tiles.
-        MapInfo currentTile = rc.senseMapInfo(rc.getLocation());
-        if (!currentTile.getPaint().isAlly() && rc.canAttack(rc.getLocation())){
-            rc.attack(rc.getLocation());
-        }
-
-
-        //new code isnt ready, dont run it
-        /* 
-        return;
-        MapLocation currenLoc = rc.getLocation();
-        // get our ammount of paint
-        int currentPaint = rc.getPaint();
-
-        // we dont have attacking code rn so we are an explorer
-            // we havent set a goal yet
-            if (goal == null) {
-                // lets set a location
-                //placeholder values, maxdistance 50 and mapsize max 
-                goal = setFarthest(currenLoc, 50, 60, 60);
-
-                // wait how do we get current location
-                // theres something on it in the documentation
-            }
-            // lets search our surriondings
-           MapLocation[] ruins = rc.senseNearbyRuins(1000);
-
-            if(ruins.length > 0){
-                // we found
-                MapInfo closestRuin = null;
-
-            }
-            //now lets search for other robots(this should include towers i think)
-            // lets search our surriondings
-           MapLocation[] ruins = rc.senseNearbyRuins(1000);
-        }
-
-        // if we found a ruin
-        if (curRuin != null) {
-            // get the location
-            MapLocation targetLoc = curRuin.getMapLocation();
-            Direction dir = rc.getLocation().directionTo(targetLoc);
-            // move twards it
-            if (rc.canMove(dir)) {
-                rc.move(dir);
-            }
-            // Mark the pattern we need to draw to build a tower here if we haven't already.
-            MapLocation shouldBeMarked = curRuin.getMapLocation().subtract(dir);
             if (rc.senseMapInfo(shouldBeMarked).getMark() == PaintType.EMPTY
                     && rc.canMarkTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc)) {
                 rc.markTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc);
@@ -407,9 +367,8 @@ public class RobotPlayer {
             for (MapInfo patternTile : rc.senseNearbyMapInfos(targetLoc, 8)) {
                 if (patternTile.getMark() != patternTile.getPaint() && patternTile.getMark() != PaintType.EMPTY) {
                     boolean useSecondaryColor = patternTile.getMark() == PaintType.ALLY_SECONDARY;
-                    if (rc.canAttack(patternTile.getMapLocation())) {
+                    if (rc.canAttack(patternTile.getMapLocation()))
                         rc.attack(patternTile.getMapLocation(), useSecondaryColor);
-                    }
                 }
             }
             // Complete the ruin if we can.
@@ -432,7 +391,86 @@ public class RobotPlayer {
         if (!currentTile.getPaint().isAlly() && rc.canAttack(rc.getLocation())) {
             rc.attack(rc.getLocation());
         }
-            */
+
+        // new code isnt ready, dont run it
+        /*
+         * return;
+         * MapLocation currenLoc = rc.getLocation();
+         * // get our ammount of paint
+         * int currentPaint = rc.getPaint();
+         * 
+         * // we dont have attacking code rn so we are an explorer
+         * // we havent set a goal yet
+         * if (goal == null) {
+         * // lets set a location
+         * //placeholder values, maxdistance 50 and mapsize max
+         * goal = setFarthest(currenLoc, 50, 60, 60);
+         * 
+         * // wait how do we get current location
+         * // theres something on it in the documentation
+         * }
+         * // lets search our surriondings
+         * MapLocation[] ruins = rc.senseNearbyRuins(1000);
+         * 
+         * if(ruins.length > 0){
+         * // we found
+         * MapInfo closestRuin = null;
+         * 
+         * }
+         * //now lets search for other robots(this should include towers i think)
+         * // lets search our surriondings
+         * MapLocation[] ruins = rc.senseNearbyRuins(1000);
+         * }
+         * 
+         * // if we found a ruin
+         * if (curRuin != null) {
+         * // get the location
+         * MapLocation targetLoc = curRuin.getMapLocation();
+         * Direction dir = rc.getLocation().directionTo(targetLoc);
+         * // move twards it
+         * if (rc.canMove(dir)) {
+         * rc.move(dir);
+         * }
+         * // Mark the pattern we need to draw to build a tower here if we haven't
+         * already.
+         * MapLocation shouldBeMarked = curRuin.getMapLocation().subtract(dir);
+         * if (rc.senseMapInfo(shouldBeMarked).getMark() == PaintType.EMPTY
+         * && rc.canMarkTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc)) {
+         * rc.markTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc);
+         * System.out.println("Trying to build a tower at " + targetLoc);
+         * }
+         * // Fill in any spots in the pattern with the appropriate paint.
+         * for (MapInfo patternTile : rc.senseNearbyMapInfos(targetLoc, 8)) {
+         * if (patternTile.getMark() != patternTile.getPaint() && patternTile.getMark()
+         * != PaintType.EMPTY) {
+         * boolean useSecondaryColor = patternTile.getMark() ==
+         * PaintType.ALLY_SECONDARY;
+         * if (rc.canAttack(patternTile.getMapLocation())) {
+         * rc.attack(patternTile.getMapLocation(), useSecondaryColor);
+         * }
+         * }
+         * }
+         * // Complete the ruin if we can.
+         * if (rc.canCompleteTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc)) {
+         * rc.completeTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc);
+         * rc.setTimelineMarker("Tower built", 0, 255, 0);
+         * System.out.println("Built a tower at " + targetLoc + "!");
+         * }
+         * }
+         * 
+         * // Move and attack randomly if no objective.
+         * Direction dir = directions[rng.nextInt(directions.length)];
+         * MapLocation nextLoc = rc.getLocation().add(dir);
+         * if (rc.canMove(dir)) {
+         * rc.move(dir);
+         * }
+         * // Try to paint beneath us as we walk to avoid paint penalties.
+         * // Avoiding wasting paint by re-painting our own tiles.
+         * MapInfo currentTile = rc.senseMapInfo(rc.getLocation());
+         * if (!currentTile.getPaint().isAlly() && rc.canAttack(rc.getLocation())) {
+         * rc.attack(rc.getLocation());
+         * }
+         */
     }
 
     public static void runSplasher(RobotController rc) throws GameActionException {
@@ -461,23 +499,40 @@ public class RobotPlayer {
         // updateEnemyRobots(rc);
     }
 
-    // returns an array of enemy robots
-    public static RobotInfo[] findEnemyRobots(RobotController rc) throws GameActionException {
+    public class bots {
+        public RobotInfo[] allies;
+        public RobotInfo[] enemies;
+
+        public bots(RobotInfo[] nearbyAllies, RobotInfo[] nearbyEnemies) {
+            allies = nearbyAllies;
+            enemies = nearbyEnemies;
+        }
+    }
+
+    // returns an enemy and allied bots arrays
+    public static bots findNearbyBots(RobotController rc) throws GameActionException {
         // find nearby robots
         RobotInfo[] nearbyRobots = rc.senseNearbyRobots();
 
         // create an array, this will store enemies
         RobotInfo[] nearbyEnemies = null;
 
+        // create an array, this will store allies
+        RobotInfo[] nearbyAllies = null;
+
         int a = 0;
+        int b = 0;
         // go through each bot
         for (int i = 0; i < nearbyRobots.length; i++) {
             if (nearbyRobots[i].getTeam() != rc.getTeam()) {
                 nearbyEnemies[a] = nearbyRobots[i];
                 a++;
+            } else {
+                nearbyAllies[b] = nearbyRobots[i];
+                b++;
             }
         }
-        return nearbyEnemies;
+        return new bots(nearbyAllies, nearbyEnemies);
     }
 
     // calculate the distance between two points
@@ -490,7 +545,7 @@ public class RobotPlayer {
     }
 
     // figure out the best direction to move given a destination and start
-    public static Direction moveTowards(RobotController rc,MapLocation currentLoc, MapLocation endLoc) {
+    public static Direction moveTowards(RobotController rc, MapLocation currentLoc, MapLocation endLoc) {
         Direction dir;
         boolean picknext = false;
         // check if it's right
@@ -568,40 +623,44 @@ public class RobotPlayer {
         // ok bro, we're already at the destination
         return Direction.CENTER;
     }
-    //Generates a random map location the farthest distance a player can move
-    //If all maps are square, you can merge x and y size
-    //This doesn't pythagorean theorem this just uses max side length of that triange
-    //I'll probably add pythagorean theorem to calculate that tomorrow
-    public static MapLocation setFarthest(MapLocation currentLoc, int maxDistance, int mapXSize, int mapYSize){
+
+    // Generates a random map location the farthest distance a player can move
+    // If all maps are square, you can merge x and y size
+    // This doesn't pythagorean theorem this just uses max side length of that
+    // triange
+    // I'll probably add pythagorean theorem to calculate that tomorrow
+    public static MapLocation setFarthest(MapLocation currentLoc, int maxDistance, int mapXSize, int mapYSize) {
         int sideLength = maxDistance * 2;
         int x = currentLoc.x - maxDistance + rng.nextInt(sideLength + 1);
         int y = currentLoc.y - maxDistance + rng.nextInt(sideLength + 1);
 
-        //clamps the x and y to inside the map.
+        // clamps the x and y to inside the map.
         x = Math.clamp(x, 0, mapXSize);
         y = Math.clamp(y, 0, mapYSize);
 
-        return new MapLocation(x,y);
+        return new MapLocation(x, y);
     }
 
-    public static Message buildMessage(int type, MapLocation currentLoc, int id, int round){
-        Message message = new Message((type * 10000)+(currentLoc.x * 100)+currentLoc.y, id, round);
+    public static Message buildMessage(int type, MapLocation currentLoc, int id, int round) {
+        Message message = new Message((type * 10000) + (currentLoc.x * 100) + currentLoc.y, id, round);
         return message;
     }
 
-    public static HashMap<String, Integer> parseMessage(Message message){
+    public static HashMap<String, Integer> parseMessage(Message message) {
         int bytes = message.getBytes();
-        int type = bytes/10000;
-        int xloc = (bytes/100)%100;
-        int yloc = bytes%100;
+        int type = bytes / 10000;
+        int xloc = (bytes / 100) % 100;
+        int yloc = bytes % 100;
 
-        HashMap<String, Integer> messageData = new HashMap<String, Integer>() {{
-            put("type", type);
-            put("xloc", xloc);
-            put("yloc", yloc);
-            put("sender", message.getSenderID());
-            put("roundSent", message.getRound());
-        }};
+        HashMap<String, Integer> messageData = new HashMap<String, Integer>() {
+            {
+                put("type", type);
+                put("xloc", xloc);
+                put("yloc", yloc);
+                put("sender", message.getSenderID());
+                put("roundSent", message.getRound());
+            }
+        };
         return messageData;
     }
 }
