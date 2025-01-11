@@ -222,8 +222,13 @@ public class RobotPlayer {
         // each turn we get one single-block attack and one multi block attack
         // if theres only one enemy just use both attacks on them
         if (enemies.size() == 1) {
-            rc.attack(enemies.get(0).getLocation());
-            rc.attack(enemies.get(0).getLocation());
+            //if in range
+            if(rc.canAttack(enemies.get(0).getLocation())){
+                //attack
+                rc.attack(enemies.get(0).getLocation());
+                //area
+                rc.attack(null);
+            }
         } else {
             // find all the locations and distances
             ArrayList<MapLocation> locations = new ArrayList<>();
@@ -236,12 +241,13 @@ public class RobotPlayer {
                 // get distance to us
                 distance.add(locations.get(i).distanceSquaredTo(location));
             }
-            // first, we'll do our single tile attack on the closest bot
+            // if within range we'll use our single cell attack on the closest bot and also area
             MapLocation closest = locations.get(getLowest(distance));
-            rc.attack(closest);
-
-            // area is yet to be coded, just attack again
-            rc.attack(closest);
+            if(rc.canAttack(closest)){
+                rc.attack(closest);
+                //area
+                rc.attack(null);
+            }
         }
     }
 
@@ -331,7 +337,9 @@ public class RobotPlayer {
                 rc.buildRobot(UnitType.MOPPER, nextLoc);
                 System.out.println("BUILT A MOPPER");
             } else {
-                rc.buildRobot(UnitType.SPLASHER, nextLoc);
+                //rc.buildRobot(UnitType.SPLASHER, nextLoc);
+                rc.buildRobot(UnitType.SOLDIER, nextLoc);
+
                 System.out.println("BUILT A SPLASHER");
             }
 
