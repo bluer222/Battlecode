@@ -37,7 +37,7 @@ public class RobotPlayer {
     static int rpty = 99;
 
     // store the MapLocation for the tower we built
-    static MapLocation builtTower;
+    static MapLocation builtTower = null;
     // store the MapLocation objects for found enemy towers
     static ArrayList<MapLocation> foundE = new ArrayList<>();
 
@@ -374,20 +374,16 @@ public class RobotPlayer {
      * loop in run(), so it is called once per turn.
      */
     public static void runSoldier(RobotController rc) throws GameActionException {
+        // if our paint is low, refil
+        if (rc.getPaint() <= 100 && done == 0) {
+            rc.setIndicatorString("going to refil paint");
+
+            done = 1;
+            //we need to ask others for tower locations if we have none
+            goal = getClosest(rc, towers);
+        }
         rc.setIndicatorString(Integer.toString(done));
 
-        // we havent set a goal
-        if (goal == null) {
-            // if we have a target location then set there
-            if (targetLoc != null) {
-                goal = targetLoc;
-            } else {
-                // set a goal thats 30 tiles away
-                // we dont intend to reach our goal, only to find a ruin on the way
-                goal = setFarthest(rc.getLocation(), 30);
-                rc.setIndicatorString("set goal");
-            }
-        }
         // if we built a tower, came back, and now we're waiting for paint refil
         if (done == 2) {
             rc.setIndicatorString("refilling paint");
@@ -412,13 +408,15 @@ public class RobotPlayer {
             }
             // if we reached the tower
             if (rc.getLocation().isAdjacentTo(goal)) {
+                rc.setIndicatorString("at tower");
                 // if we built it
-                if (targetLoc == null) {
+                if (builtTower != null) {
                     rc.setIndicatorString("telling about new tower");
 
                     // if we've built a tower then tell it
                     if (rc.canSendMessage(goal)) {
                         rc.sendMessage(goal, buildMessage(1, builtTower));
+                        builtTower = null;
                         done = 2;
                     }
                 } else {
@@ -426,7 +424,7 @@ public class RobotPlayer {
                     done = 2;
                 }
             }
-        } else if (targetLoc == null) {
+        } else if (done == 0 && targetLoc == null) {
             rc.setIndicatorString("finding ruins");
 
             // if we need to find a ruin
@@ -481,10 +479,7 @@ public class RobotPlayer {
                 }
             }
 
-        }
-
-        // if found ruin and adgacent and not refilling
-        if (done == 0 && targetLoc != null && rc.getLocation().isAdjacentTo(targetLoc)) {
+        } else if (done == 0 && rc.getLocation().isAdjacentTo(targetLoc)) {
 
             // get direction to the destination
             Direction dir = rc.getLocation().directionTo(targetLoc);
@@ -498,7 +493,6 @@ public class RobotPlayer {
                 System.out.println("Trying to build a tower at " + targetLoc);
             }
             boolean hasPainted = false;
-            boolean hasMoved = false;
             // find nearby tiles
             for (MapInfo patternTile : rc.senseNearbyMapInfos(targetLoc, 8)) {
                 // if the mark is incorrect
@@ -507,6 +501,7 @@ public class RobotPlayer {
                     boolean useSecondaryColor = patternTile.getMark() == PaintType.ALLY_SECONDARY;
                     // is within range
                     if (rc.getLocation().distanceSquaredTo(patternTile.getMapLocation()) < attackRange) {
+                        rc.setIndicatorString("painting");
                         // is in range, paint it
                         rc.attack(patternTile.getMapLocation(), useSecondaryColor);
                         hasPainted = true;
@@ -514,19 +509,24 @@ public class RobotPlayer {
                         // not in range
                         Direction PatternTileDirection = moveTowards(rc, rc.getLocation(),
                                 patternTile.getMapLocation());
-                        // move twards
-                        rc.move(PatternTileDirection);
-                        hasMoved = true;
-                        // if now within range then attack
-                        if (!hasPainted
-                                || rc.getLocation().distanceSquaredTo(patternTile.getMapLocation()) < attackRange) {
-                            rc.attack(patternTile.getMapLocation(), useSecondaryColor);
-                            hasPainted = true;
+                        if (PatternTileDirection != null) {
+                            // if moving would make it in range
+                            if (patternTile.getMapLocation().subtract(PatternTileDirection)
+                                    .distanceSquaredTo(rc.getLocation()) < attackRange) {
+                                        rc.setIndicatorString("moving and painting");
+
+                                // move twards
+                                rc.move(PatternTileDirection);
+                                // if now within range then attack
+
+                                rc.attack(patternTile.getMapLocation(), useSecondaryColor);
+                                hasPainted = true;
+                            }
                         }
                     }
                 }
                 // we have already painted and moved, just exit the loop
-                if (hasMoved && hasPainted) {
+                if (hasPainted) {
                     break;
                 }
             }
@@ -548,18 +548,31 @@ public class RobotPlayer {
                 rc.setTimelineMarker("Tower built", 0, 255, 0);
                 System.out.println("Built a tower at " + targetLoc + "!");
             }
-            // if our paint is low, refil
-            if (rc.getPaint() <= 100) {
-                rc.setIndicatorString("going to refil paint");
-                done = 1;
-                goal = getClosest(rc, towers);
+
+        }
+        // we havent set a goal
+        if (goal == null) {
+            // if we have a target location then set there
+            if (targetLoc != null) {
+                goal = targetLoc;
+            } else {
+                // set a goal thats 30 tiles away
+                // we dont intend to reach our goal, only to find a ruin on the way
+                goal = setFarthest(rc.getLocation(), 30);
+                rc.setIndicatorString("set goal");
             }
-        } else {
+        }
+        if (rc.isMovementReady() && !goal.isAdjacentTo(rc.getLocation())) {
+            rc.setIndicatorString("moving twards destination");
+
             // move twards destination
             Direction dir = moveTowards(rc, rc.getLocation(), goal);
             // if we got to this point theres no way we already moved
             if (dir != null) {
                 rc.move(dir);
+            } else {
+                rc.setIndicatorString("dir was null");
+
             }
         }
     }
@@ -633,81 +646,133 @@ public class RobotPlayer {
 
     // figure out the best direction to move given a destination and start
     public static Direction moveTowards(RobotController rc, MapLocation currentLoc, MapLocation endLoc) {
-        boolean picknext = false;
-        // check if it's right
-        if (endLoc.x > currentLoc.x || picknext) {
-            // is it also up
-            if (endLoc.y > currentLoc.y || picknext) {
-                // then move right+up
-                if (rc.canMove(Direction.NORTHEAST)) {
-                    return Direction.NORTHEAST;
-                } else {
-                    // we couldent move there
-                    picknext = true;
-                }
-            }
-            // maybe its right+down then
-            if (endLoc.y < currentLoc.y || picknext) {
-                if (rc.canMove(Direction.SOUTHEAST)) {
-                    return Direction.SOUTHEAST;
-                } else {
-                    picknext = true;
-                }
-                // if not then it's directly right(not up or down)
-            } else {
-                if (rc.canMove(Direction.EAST)) {
-                    return Direction.EAST;
-                } else {
-                    picknext = true;
-                }
-            }
-            // alr bro it ain't that hard figure it out
-        }
-        // either we're going left or none of the rights worked
-        if (endLoc.x < currentLoc.x || picknext) {
-            // are we going left up
-            if (endLoc.y > currentLoc.y || picknext) {
-                if (rc.canMove(Direction.NORTHWEST)) {
-                    return Direction.NORTHWEST;
-                } else {
-                    picknext = true;
-                }
-            }
-            // maybe left down
-            if (endLoc.y < currentLoc.y || picknext) {
-                if (rc.canMove(Direction.SOUTHWEST)) {
-                    return Direction.SOUTHWEST;
-                } else {
-                    picknext = true;
-                }
-            } else {
-                // ok we must be moving left then
-                if (rc.canMove(Direction.WEST)) {
-                    return Direction.WEST;
-                } else {
-                    picknext = true;
-                }
-            }
-        }
-        // we arent going left or right if we reached this point
-        // try up
-        if (endLoc.y > currentLoc.y || picknext) {
-            if (rc.canMove(Direction.NORTH)) {
-                return Direction.NORTH;
-            } else {
-                picknext = true;
-            }
-        }
-        // try down
-        if (endLoc.y > currentLoc.y || picknext) {
-            if (rc.canMove(Direction.SOUTH)) {
-                return Direction.SOUTH;
-            } else {
-                picknext = true;
+        Direction optimalDirection = currentLoc.directionTo(endLoc);
+        Direction[] orderedDirections = getSortedDirections(optimalDirection);
+        for(int i = 0; i < orderedDirections.length; i++){
+            if (rc.canMove(orderedDirections[i])) {
+                return orderedDirections[i];
             }
         }
         // ok bro, we're already at the destination
         return null;
+    }
+
+    public static Direction[] getSortedDirections(Direction target) {
+        Direction[] orderedDirections;
+
+        switch (target) {
+            case NORTH:
+                orderedDirections = new Direction[] {
+                        Direction.NORTH,
+                        Direction.NORTHEAST,
+                        Direction.NORTHWEST,
+                        Direction.SOUTH,
+                        Direction.SOUTHEAST,
+                        Direction.SOUTHWEST,
+                        Direction.EAST,
+                        Direction.WEST
+                };
+                break;
+            case NORTHEAST:
+                orderedDirections = new Direction[] {
+                        Direction.NORTHEAST,
+                        Direction.NORTH,
+                        Direction.EAST,
+                        Direction.NORTHWEST,
+                        Direction.SOUTHEAST,
+                        Direction.SOUTH,
+                        Direction.SOUTHWEST,
+                        Direction.WEST
+                };
+                break;
+            case NORTHWEST:
+                orderedDirections = new Direction[] {
+                        Direction.NORTHWEST,
+                        Direction.NORTH,
+                        Direction.WEST,
+                        Direction.NORTHEAST,
+                        Direction.SOUTHWEST,
+                        Direction.SOUTH,
+                        Direction.EAST,
+                        Direction.SOUTHEAST
+                };
+                break;
+            case SOUTH:
+                orderedDirections = new Direction[] {
+                        Direction.SOUTH,
+                        Direction.SOUTHEAST,
+                        Direction.SOUTHWEST,
+                        Direction.NORTH,
+                        Direction.EAST,
+                        Direction.WEST,
+                        Direction.NORTHEAST,
+                        Direction.NORTHWEST
+                };
+                break;
+            case SOUTHEAST:
+                orderedDirections = new Direction[] {
+                        Direction.SOUTHEAST,
+                        Direction.SOUTH,
+                        Direction.EAST,
+                        Direction.SOUTHWEST,
+                        Direction.NORTHEAST,
+                        Direction.NORTH,
+                        Direction.NORTHWEST,
+                        Direction.WEST
+                };
+                break;
+            case SOUTHWEST:
+                orderedDirections = new Direction[] {
+                        Direction.SOUTHWEST,
+                        Direction.SOUTH,
+                        Direction.WEST,
+                        Direction.SOUTHEAST,
+                        Direction.NORTHWEST,
+                        Direction.NORTH,
+                        Direction.EAST,
+                        Direction.NORTHEAST
+                };
+                break;
+            case EAST:
+                orderedDirections = new Direction[] {
+                        Direction.EAST,
+                        Direction.NORTHEAST,
+                        Direction.SOUTHEAST,
+                        Direction.WEST,
+                        Direction.NORTH,
+                        Direction.SOUTH,
+                        Direction.NORTHWEST,
+                        Direction.SOUTHWEST
+                };
+                break;
+            case WEST:
+                orderedDirections = new Direction[] {
+                        Direction.WEST,
+                        Direction.NORTHWEST,
+                        Direction.SOUTHWEST,
+                        Direction.EAST,
+                        Direction.NORTH,
+                        Direction.SOUTH,
+                        Direction.NORTHEAST,
+                        Direction.SOUTHEAST
+                };
+                break;
+            default:
+                orderedDirections = new Direction[0]; // Empty array as a fallback
+                break;
+        }
+
+        return orderedDirections;
+    }
+
+    public static void main(String[] args) {
+        Direction target = Direction.NORTH;
+        Direction[] sortedDirections = getSortedDirections(target);
+
+        System.out.println("Sorted directions for " + target + ":");
+        for (Direction direction : sortedDirections) {
+            System.out.println(direction);
+        }
     }
 
     // figure out what direction a tower can build in
