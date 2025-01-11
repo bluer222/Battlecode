@@ -11,6 +11,9 @@ attack splashers that push into enemy terrotry(groups of these could go attack a
 connection splashers that connect btween found towers and existing towers
 
 Moppers:
+when a mopper reseves a come allong message, it goes with other bots to a destination to refil them
+when a mopper resceves a new tower built/run descovered message, it goes over to another tower and rebroadcats
+when a mopper
 two types
 support moppers go allong in attacks and refil others
 defence moppers for defence and to bring paint on request
