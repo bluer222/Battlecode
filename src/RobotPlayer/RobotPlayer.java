@@ -13,8 +13,6 @@ import java.util.Random;
 
 public class RobotPlayer {
 
-
-
     /**
      * We will use this variable to count the number of turns this robot has
      * been alive. You can use static variables like this to save any
@@ -101,14 +99,14 @@ public class RobotPlayer {
      *
      */
     public static void run(RobotController rc) throws GameActionException {
-            /*
-     * This RNG to make some random
-     * moves. The Random class is provided by the java.util.Random import at the
-     * top of this file. Here, we *seed* the RNG with a constant number (6147);
-     * this makes sure we get the same sequence of numbers every time this code
-     * is run. This is very useful for debugging!
-     */
-    rng = new Random(rc.getID());
+        /*
+         * This RNG to make some random
+         * moves. The Random class is provided by the java.util.Random import at the
+         * top of this file. Here, we *seed* the RNG with a constant number (6147);
+         * this makes sure we get the same sequence of numbers every time this code
+         * is run. This is very useful for debugging!
+         */
+        rng = new Random(rc.getID());
         mapHeight = rc.getMapHeight();
         mapWidth = rc.getMapWidth();
         // Hello world! Standard output is very useful for debugging.
@@ -408,7 +406,7 @@ public class RobotPlayer {
         // set our indicator to the task for debug
         rc.setIndicatorString(Integer.toString(task));
         // task3 means we are looking for a paint tower so we can refil
-        if (task == 3) {
+        if (task == 3 && turnCount % 2 == 0) {
             if (turnCount - goalCreationDate > 10) {
                 goalCreationDate = turnCount;
                 goal = setFarthest(rc.getLocation(), 30);
@@ -501,7 +499,7 @@ public class RobotPlayer {
                     }
                 }
             }
-        } else if (task == 0 && targetLoc == null) {
+        } else if (task == 0 && targetLoc == null && turnCount % 2 == 0) {
             if (turnCount - goalCreationDate > 10) {
                 goalCreationDate = turnCount;
                 goal = setFarthest(rc.getLocation(), 30);
@@ -552,10 +550,10 @@ public class RobotPlayer {
                 // set it as the goal
                 goal = targetLoc;
                 // set the tower type we'll build
-                if (rc.getID() % 2 == 0) {
-                    goalType = UnitType.LEVEL_ONE_PAINT_TOWER;
-                } else {
+                if (rc.getMoney() < 1500) {
                     goalType = UnitType.LEVEL_ONE_MONEY_TOWER;
+                } else {
+                    goalType = UnitType.LEVEL_ONE_PAINT_TOWER;
                 }
             }
         } else if (task == 0 && rc.getLocation().isAdjacentTo(targetLoc)) {
@@ -659,7 +657,6 @@ public class RobotPlayer {
                 // logs
                 rc.setTimelineMarker("Tower built", 0, 255, 0);
             }
-
         }
         // we havent set a goal
         if (goal == null) {
@@ -734,7 +731,7 @@ public class RobotPlayer {
 
         } else {
             // once every 3 turns
-            if (turnCount % 2 == 0) {
+            if (turnCount % 3 == 0) {
                 // sense nearby bots
                 bots nearbyBots = findNearbyBots(rc);
                 // freinds
