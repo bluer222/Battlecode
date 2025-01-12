@@ -52,6 +52,9 @@ public class RobotPlayer {
 
     // we must define these variables here so they will be global
     static MapLocation goal = null;
+    //when the goal was created
+    static int goalCreationDate;
+
     static boolean isOriginal;
     static UnitType botType;
     // if we are a mopper this is the soldier we are following
@@ -396,6 +399,7 @@ public class RobotPlayer {
                 // task3 has us look for towers
                 task = 3;
                 // set a random goal
+                goalCreationDate = turnCount;
                 goal = setFarthest(rc.getLocation(), 30);
             }
         }
@@ -403,6 +407,10 @@ public class RobotPlayer {
         rc.setIndicatorString(Integer.toString(task));
         // task3 means we are looking for a paint tower so we can refil
         if (task == 3) {
+            if(turnCount-goalCreationDate > 10){
+                goalCreationDate = turnCount;
+                goal = setFarthest(rc.getLocation(), 30);
+            }
             // sense ruins
             MapLocation[] ruins = rc.senseNearbyRuins(-1);
             // for each
@@ -477,6 +485,10 @@ public class RobotPlayer {
                 }
             }
         } else if (task == 0 && targetLoc == null) {
+            if(turnCount-goalCreationDate > 10){
+                goalCreationDate = turnCount;
+                goal = setFarthest(rc.getLocation(), 30);
+            }
             // if task it 0 then we're exploring
             // this runst if we're exploring and have not found a ruin
 
@@ -599,6 +611,21 @@ public class RobotPlayer {
                 // logs
                 rc.setTimelineMarker("Tower built", 0, 255, 0);
             }
+            //if another explorer built it for us
+            if(rc.canSenseRobotAtLocation(targetLoc)){
+                // yay we created
+                // now the task is to go back and refil on paint
+                task = 1;
+                // set the goal to the closest preexisting paint tower
+                goal = getClosest(rc, towers);
+                // if applicable add this as a new paint tower
+                if (rc.senseRobotAtLocation(targetLoc).getType() == UnitType.LEVEL_ONE_PAINT_TOWER) {
+                    towers.add(targetLoc);
+                }
+                // reset target and reset built
+                builtTower = null;
+                targetLoc = null;
+            }
         }
         // we havent set a goal
         if (goal == null) {
@@ -638,6 +665,10 @@ public class RobotPlayer {
      * loop in run(), so it is called once per turn.
      */
     public static void runMopper(RobotController rc) throws GameActionException {
+        //update the robot we're following
+        if(following!= null && rc.canSenseRobot(followingID)){
+            following = rc.senseRobot(followingID);
+        }
         // if low on paint
         if (goal != null) {
             // go twards tower
@@ -676,7 +707,7 @@ public class RobotPlayer {
                         rc.setIndicatorString("added allied tower");
                         towers.add(ally.getLocation());
                     } else if (ally.getType() == UnitType.SOLDIER) {
-                        if (following == null || followingID == ally.getID()) {
+                        if (following == null) {
                             // lets follow the explorer
                             rc.setIndicatorString("following ally");
 
