@@ -362,6 +362,9 @@ public class RobotPlayer {
 
             botQueue.add(rng.nextInt(3) + 1);
         }
+        if(botQueue.isEmpty() && rc.getMoney() > 5000 && rc.getPaint() >= 100 && isMoneyTower(rc.getType())){
+            botQueue.add(2);
+        }
         if (!botQueue.isEmpty()) {
             // sometimes someone takes
 
@@ -1089,6 +1092,10 @@ public class RobotPlayer {
     public static boolean isPaintTower(UnitType unit) {
         return unit == UnitType.LEVEL_ONE_PAINT_TOWER || unit == UnitType.LEVEL_TWO_PAINT_TOWER
                 || unit == UnitType.LEVEL_THREE_PAINT_TOWER;
+    }
+    public static boolean isMoneyTower(UnitType unit) {
+        return unit == UnitType.LEVEL_ONE_MONEY_TOWER || unit == UnitType.LEVEL_TWO_MONEY_TOWER
+                || unit == UnitType.LEVEL_THREE_MONEY_TOWER;
     }
 
     // returns an enemy and allied bots arrays

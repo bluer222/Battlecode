@@ -1,10 +1,4 @@
-why are so many bytecodes used on the turn that finishes the tower
 
-instead of checking for tiles to paint every turn, check every other turn and store a paintnext location(or maybe multiple)
-
-every time movement goes in an unoptimal direction, increment variable if grater than 3 then make a new goal
-
-towers should upgrade themselves when there are tons of tokens
 
 Types:
 soliders:

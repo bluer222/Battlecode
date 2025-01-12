@@ -362,7 +362,7 @@ public class RobotPlayer {
 
             botQueue.add(rng.nextInt(3) + 1);
         }
-        if(botQueue.isEmpty() && rc.getMoney() > 5000 && rc.getPaint() >= 100 && isMoneyTower(rc.getType())){
+        if (botQueue.isEmpty() && rc.getMoney() > 5000 && rc.getPaint() >= 100 && isMoneyTower(rc.getType())) {
             botQueue.add(2);
         }
         if (!botQueue.isEmpty()) {
@@ -736,7 +736,10 @@ public class RobotPlayer {
                                 System.out.println("Somoene else already built tower at " + targetLoc);
 
                                 // yay we created
-
+                                // if applicable add this as a new paint tower
+                                if (isPaintTower(rc.senseRobotAtLocation(targetLoc).getType())) {
+                                    towers.add(targetLoc);
+                                }
                                 // now the task is to go back and refil on paint
                                 if (towers.size() > 0) {
                                     // stop building, set the task to refil instead
@@ -750,10 +753,7 @@ public class RobotPlayer {
                                     unoptimalMoves = 0;
                                     goal = setFarthest(rc.getLocation(), 30);
                                 }
-                                // if applicable add this as a new paint tower
-                                if (isPaintTower(rc.senseRobotAtLocation(targetLoc).getType())) {
-                                    towers.add(targetLoc);
-                                }
+
                                 // reset target and reset built
                                 builtTower = null;
                                 targetLoc = null;
@@ -779,6 +779,10 @@ public class RobotPlayer {
                                     // Complete the ruin if we can.
                                     rc.completeTowerPattern(towerType, targetLoc);
                                     // yay we created
+                                    // if applicable add this as a new paint tower
+                                    if (paintTower) {
+                                        towers.add(targetLoc);
+                                    }
                                     // now the task is to go back and refil on paint
                                     if (towers.size() > 0) {
                                         // stop building, set the task to refil instead
@@ -792,10 +796,7 @@ public class RobotPlayer {
                                         unoptimalMoves = 0;
                                         goal = setFarthest(rc.getLocation(), 30);
                                     }
-                                    // if applicable add this as a new paint tower
-                                    if (paintTower) {
-                                        towers.add(targetLoc);
-                                    }
+
                                     // reset target and set built
                                     builtTower = targetLoc;
                                     targetLoc = null;
@@ -1093,6 +1094,7 @@ public class RobotPlayer {
         return unit == UnitType.LEVEL_ONE_PAINT_TOWER || unit == UnitType.LEVEL_TWO_PAINT_TOWER
                 || unit == UnitType.LEVEL_THREE_PAINT_TOWER;
     }
+
     public static boolean isMoneyTower(UnitType unit) {
         return unit == UnitType.LEVEL_ONE_MONEY_TOWER || unit == UnitType.LEVEL_TWO_MONEY_TOWER
                 || unit == UnitType.LEVEL_THREE_MONEY_TOWER;
