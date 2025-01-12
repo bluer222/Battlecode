@@ -402,7 +402,7 @@ public class RobotPlayer {
         // if we have built all towers
         if (maxTowers) {
             // we should attack
-            //if new or if no goal
+            // if new or if no goal
             if (task == -1 || goal == null) {
                 // set to closest enemy tower
                 if (foundE.size() > 0) {
@@ -419,8 +419,8 @@ public class RobotPlayer {
             // defend ourselves
             if (turnCount % 2 == 0 || enemiesNearby) {
                 bots nearbyBots = findNearbyBots(rc);
-                //lets check allies too
-                if(nearbyBots.allies.size() > 0){
+                // lets check allies too
+                if (nearbyBots.allies.size() > 0) {
                     for (RobotInfo ally : nearbyBots.allies) {
                         if (isPaintTower(ally.type) && !towers.contains(ally.getLocation())) {
                             towers.add(ally.getLocation());
@@ -489,8 +489,8 @@ public class RobotPlayer {
             } else {
                 // move twards goal
                 Direction dir = moveTowards(rc, rc.getLocation(), goal);
-                if(dir != null){
-                rc.move(dir);
+                if (dir != null) {
+                    rc.move(dir);
                 }
             }
             // if our paint is low, and we are building a tower
@@ -691,10 +691,10 @@ public class RobotPlayer {
                             // find nearby tiles
                             paintNext = getLocationsWithinRadiusSquared(targetLoc, 8);
                             justFound -= 1;
-                        } else if(rc.getChips() < 1000){
-                            //we dont have enoguht chips
-                            //just do nothing until we have enough
-                        }else {
+                        } else if (rc.getChips() < 1000) {
+                            // we dont have enoguht chips
+                            // just do nothing until we have enough
+                        } else {
                             // this must be a known tower
                             // maybe its already built
                             // if another explorer built it for us
@@ -779,46 +779,64 @@ public class RobotPlayer {
                     }
                     if (task == 0 && paintNext.size() != 0 && targetLoc != null
                             && rc.getLocation().isAdjacentTo(targetLoc)) {
-                        while (paintNext.size() > 0) {
-                            if (rc.canSenseLocation(paintNext.get(0))) {
+                        for (int i = 0; i < paintNext.size(); i++) {
+                            if (rc.canSenseLocation(paintNext.get(i))) {
                                 // get the tile
-                                MapInfo tile = rc.senseMapInfo(paintNext.get(0));
-                                // if it is incorreclty painted
-                                if (tile.getMark() != tile.getPaint()
-                                        && tile.getMark() != PaintType.EMPTY
-                                        && !tile.getPaint().isEnemy()) {
+                                MapInfo tile = rc.senseMapInfo(paintNext.get(i));
+                                // if its enemy
+                                if (tile.getPaint().isEnemy() && tile.getMark() != PaintType.EMPTY) {
+                                    //do nothing
+                                } else if (tile.getMark() != tile.getPaint() && tile.getMark() != PaintType.EMPTY) {
+                                    // if it is incorreclty painted
                                     // get correct mark
                                     boolean useSecondaryColor = tile.getMark() == PaintType.ALLY_SECONDARY;
                                     // is within range
-                                    if (rc.getLocation().distanceSquaredTo(paintNext.get(0)) < attackRange) {
-                                        rc.setIndicatorString("painting " + paintNext.get(0));
+                                    if (rc.getLocation().distanceSquaredTo(paintNext.get(i)) < attackRange) {
+                                        rc.setIndicatorString("painting " + paintNext.get(i));
                                         // is in range, paint it
-                                        rc.attack(paintNext.get(0), useSecondaryColor);
+                                        rc.attack(paintNext.get(i), useSecondaryColor);
+                                        paintNext.remove(i);
+                                        i--;
                                         // we're done paiting for this turn
                                         break;
                                     } else {
                                         // not in range
                                         Direction PatternTileDirection = moveTowards(rc, rc.getLocation(),
-                                                paintNext.get(0));
+                                                paintNext.get(i));
                                         if (PatternTileDirection != null) {
                                             // if moving would make it in range
-                                            if (paintNext.get(0).subtract(PatternTileDirection)
+                                            if (paintNext.get(i).subtract(PatternTileDirection)
                                                     .distanceSquaredTo(rc.getLocation()) < attackRange) {
                                                 rc.setIndicatorString("moving and painting");
 
                                                 // move twards
                                                 rc.move(PatternTileDirection);
                                                 // now its within range so paint it
-                                                rc.attack(paintNext.get(0), useSecondaryColor);
+                                                rc.attack(paintNext.get(i), useSecondaryColor);
+                                                paintNext.remove(i);
+                                                i--;
+
                                                 // we're done paiting for this turn
                                                 break;
                                             }
+                                        } else {
+                                            // this tile is outside sensing range, correctly painted, or too far, remove
+                                            // it
+                                            paintNext.remove(i);
+                                            i--;
                                         }
                                     }
+                                }else {
+                                    // this tile is outside sensing range, correctly painted, or too far, remove
+                                    // it
+                                    paintNext.remove(i);
+                                    i--;
                                 }
+                            } else {
+                                // this tile is outside sensing range, correctly painted, or too far, remove it
+                                paintNext.remove(i);
+                                i--;
                             }
-                            // this tile is outside sensing range, correctly painted, or too far, remove it
-                            paintNext.remove(0);
                         }
                     }
                 }
@@ -1026,9 +1044,12 @@ public class RobotPlayer {
         }
 
     }
-    public static boolean isPaintTower(UnitType unit){
-        return unit == UnitType.LEVEL_ONE_PAINT_TOWER || unit == UnitType.LEVEL_TWO_PAINT_TOWER || unit == UnitType.LEVEL_THREE_PAINT_TOWER;
+
+    public static boolean isPaintTower(UnitType unit) {
+        return unit == UnitType.LEVEL_ONE_PAINT_TOWER || unit == UnitType.LEVEL_TWO_PAINT_TOWER
+                || unit == UnitType.LEVEL_THREE_PAINT_TOWER;
     }
+
     // returns an enemy and allied bots arrays
     public static bots findNearbyBots(RobotController rc) throws GameActionException {
         // find nearby robots
