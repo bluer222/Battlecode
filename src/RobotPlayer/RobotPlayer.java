@@ -31,6 +31,7 @@ public class RobotPlayer {
     static MapLocation builtTower = null;
     // store the MapLocation objects for found enemy towers
     static ArrayList<MapLocation> foundE = new ArrayList<>();
+    static boolean justFound = false;
 
     // when we start an exploration, we should start neer a paint tower and store it
     // here
@@ -70,6 +71,8 @@ public class RobotPlayer {
     static MapLocation targetLoc = null;
     // the type of tower we're building
     static UnitType goalType = UnitType.LEVEL_ONE_PAINT_TOWER;
+    // have we built the max nummber of towers
+    static boolean maxTowers = false;
 
     // were enemies seen last time we checked
     static boolean enemiesNearby = false;
@@ -396,118 +399,68 @@ public class RobotPlayer {
     public static void runSoldier(RobotController rc) throws GameActionException {
         // set our indicator to the task for debug
         rc.setIndicatorString(Integer.toString(unoptimalMoves));
-        // if we are searching and we find out its already built, then this will go back
-        // to the start
-        // if our paint is low, and we are building a tower
-        if (rc.getPaint() <= 100 && task == 0) {
-            rc.setIndicatorString("going to refil paint");
-            paintNext.clear();
-            // TODO: we need to ask others for tower locations if we have none(instead of
-            // erroring)
-            if (towers.size() > 0) {
-                // stop building, set the task to refil instead
-                task = 1;
-                goal = getClosest(rc, towers);
-            } else {
-                // oh no, we dont know any towers
-                // task3 has us look for towers
-                task = 3;
-                // set a random goal
-                goal = setFarthest(rc.getLocation(), 30);
-                unoptimalMoves = 0;
-            }
-        }
+        // if we have built all towers
+        if (maxTowers) {
+            // we should attack
 
-        // task3 means we are looking for a paint tower so we can refil
-        if (task == 3 && turnCount % 2 == 0) {
+        } else {
+            // task3 means we are looking for a paint tower so we can refil
+            if (task == 3) {
+                // lets only check every other turn
+                if (turnCount % 2 == 0) {
+                    // sense ruins
+                    MapLocation[] ruins = rc.senseNearbyRuins(-1);
+                    // for each
+                    for (int i = 0; i < ruins.length; i++) {
+                        // towers are a type of robot, this checks if there is a tower on the ruin
+                        if (rc.canSenseRobotAtLocation(ruins[i])) {
+                            RobotInfo tower = rc.senseRobotAtLocation(ruins[i]);
+                            // is it our our team
+                            if (tower.getTeam() == rc.getTeam()) {
+                                rc.setIndicatorString("found a freindly tower2");
 
-            // sense ruins
-            MapLocation[] ruins = rc.senseNearbyRuins(-1);
-            // for each
-            for (int i = 0; i < ruins.length; i++) {
-                // towers are a type of robot, this checks if there is a tower on the ruin
-                if (rc.canSenseRobotAtLocation(ruins[i])) {
-                    RobotInfo tower = rc.senseRobotAtLocation(ruins[i]);
-                    // is it our our team
-                    if (tower.getTeam() == rc.getTeam()) {
-                        rc.setIndicatorString("found a freindly tower2");
-
-                        // if its a paint tower
-                        if (tower.getType() == UnitType.LEVEL_ONE_PAINT_TOWER) {
-                            // add it to the allied towers
-                            if (!towers.contains(ruins[i])) {
-                                towers.add(ruins[i]);
-                                // yay we can get paint now
-                                goal = ruins[i];
-                                task = 1;
+                                // if its a paint tower
+                                if (tower.getType() == UnitType.LEVEL_ONE_PAINT_TOWER) {
+                                    // add it to the allied towers
+                                    if (!towers.contains(ruins[i])) {
+                                        towers.add(ruins[i]);
+                                        // yay we can get paint now
+                                        goal = ruins[i];
+                                        task = 1;
+                                    }
+                                }
+                            } else {
+                                // its an enemy tower
+                                rc.setIndicatorString("found an enemy tower");
+                                // add it to found enemies
+                                if (!foundE.contains(ruins[i])) {
+                                    foundE.add(ruins[i]);
+                                }
                             }
                         }
-                    } else {
-                        // its an enemy tower
-                        rc.setIndicatorString("found an enemy tower");
-                        // add it to found enemies
-                        if (!foundE.contains(ruins[i])) {
-                            foundE.add(ruins[i]);
-                        }
                     }
                 }
-            }
-        } else if (task == 2 && turnCount % 2 == 0) {
-            // task2 means we have 0.built 1.came back+reported and finally now we're
-            // refilling
-            rc.setIndicatorString("refilling paint");
-            // since we just went over to the tower to report, we're already adjacent so we
-            // can transfer
-            // check how much paint the tower has
-            int paint = rc.senseRobotAtLocation(goal).getPaintAmount();
-            if (rc.isActionReady()) {
-                // if its more than we need, then take the ammount we need
-                if (paint >= 200 - rc.getPaint()) {
-                    rc.transferPaint(goal, -(200 - rc.getPaint()));
-                } else if (paint > 0) {
-                    // if its less than we need, take it all
-                    rc.transferPaint(goal, -paint);
+            } else if (task == 2) {
+                // task2 means we have 0.built 1.came back+reported and finally now we're
+                // refilling
+                if (turnCount % 2 == 0) {
+                    rc.setIndicatorString("refilling paint");
+                    // since we just went over to the tower to report, we're already adjacent so we
+                    // can transfer
+                    // check how much paint the tower has
+                    int paint = rc.senseRobotAtLocation(goal).getPaintAmount();
+                    if (rc.isActionReady()) {
+                        // if its more than we need, then take the ammount we need
+                        if (paint >= 200 - rc.getPaint()) {
+                            rc.transferPaint(goal, -(200 - rc.getPaint()));
+                        } else if (paint > 0) {
+                            // if its less than we need, take it all
+                            rc.transferPaint(goal, -paint);
 
-                }
-            }
-            // if our paint is good enogh
-            if (rc.getPaint() > 170) {
-                // task = 0 means we will go and explore again
-                task = 0;
-                if (targetLoc != null) {
-                    goal = targetLoc;
-                } else {
-                    goal = setFarthest(rc.getLocation(), 30);
-
-                }
-            }
-        } else if (task == 1) {
-            // task1 means we found and built a tower, and now we're going back
-            // if builttower is null then we are going back to refill paint instead
-            // if we reached the tower
-            if (rc.getLocation().isAdjacentTo(goal)) {
-                rc.setIndicatorString("at tower");
-                // if we built it
-                if (builtTower != null) {
-                    rc.setIndicatorString("telling about new tower");
-
-                    // if we've built a tower then tell it
-                    if (rc.canSendMessage(goal)) {
-                        rc.sendMessage(goal, buildMessage(1, builtTower));
-                        builtTower = null;
-                        if (rc.getPaint() != 200) {
-                            task = 2;
-                        } else {
-                            // task = 0 means we will go and explore again
-                            task = 0;
-                            goal = setFarthest(rc.getLocation(), 30);
                         }
                     }
-                } else {
-                    // we must just be refilling
-                    if (rc.getPaint() != 200) {
-                        task = 2;
-                    } else {
+                    // if our paint is good enogh
+                    if (rc.getPaint() > 170) {
                         // task = 0 means we will go and explore again
                         task = 0;
                         if (targetLoc != null) {
@@ -518,73 +471,258 @@ public class RobotPlayer {
                         }
                     }
                 }
-            }
-        } else if (task == 0 && targetLoc == null && turnCount % 2 == 0) {
-            // if task it 0 then we're exploring
-            // this runst if we're exploring and have not found a ruin
+            } else if (task == 1) {
+                // task1 means we found and built a tower, and now we're going back
+                // if builttower is null then we are going back to refill paint instead
+                // if we reached the tower
+                if (rc.getLocation().isAdjacentTo(goal)) {
+                    rc.setIndicatorString("at tower");
+                    // if we built it
+                    if (builtTower != null) {
+                        rc.setIndicatorString("telling about new tower");
 
-            rc.setIndicatorString("finding ruins");
-            // array of unbuilt ruins
-            ArrayList<MapLocation> emptyRuins = new ArrayList<>();
-            // sense ruins
-            MapLocation[] ruins = rc.senseNearbyRuins(-1);
-            // for each
-            for (int i = 0; i < ruins.length; i++) {
-                // towers are a type of robot, this checks if there is a tower on the ruin
-                if (rc.canSenseRobotAtLocation(ruins[i])) {
-                    RobotInfo tower = rc.senseRobotAtLocation(ruins[i]);
-                    // is it our our team
-                    if (tower.getTeam() == rc.getTeam()) {
-                        rc.setIndicatorString("found a freindly tower");
-
-                        // if its a paint tower
-                        if (tower.getType() == UnitType.LEVEL_ONE_PAINT_TOWER) {
-                            // add it to the allied towers
-                            if (!towers.contains(ruins[i])) {
-                                towers.add(ruins[i]);
+                        // if we've built a tower then tell it
+                        if (rc.canSendMessage(goal)) {
+                            rc.sendMessage(goal, buildMessage(1, builtTower));
+                            builtTower = null;
+                            if (rc.getPaint() != 200) {
+                                task = 2;
+                            } else {
+                                // task = 0 means we will go and explore again
+                                task = 0;
+                                goal = setFarthest(rc.getLocation(), 30);
                             }
                         }
                     } else {
-                        // its an enemy tower
-                        rc.setIndicatorString("found an enemy tower");
-                        // add it to found enemies
-                        if (!foundE.contains(ruins[i])) {
-                            foundE.add(ruins[i]);
+                        // we must just be refilling
+                        if (rc.getPaint() != 200) {
+                            task = 2;
+                        } else {
+                            // task = 0 means we will go and explore again
+                            task = 0;
+                            if (targetLoc != null) {
+                                goal = targetLoc;
+                            } else {
+                                goal = setFarthest(rc.getLocation(), 30);
+
+                            }
                         }
                     }
-                } else {
-                    // no tower, this is an empty ruin
-                    emptyRuins.add(ruins[i]);
+                }
+            } else if (task == 0) {
+                // if task it 0 then we're exploring
+                // this runst if we're exploring and have not found a ruin
+                if (targetLoc == null && turnCount % 2 == 0) {
+                    rc.setIndicatorString("finding ruins");
+                    // array of unbuilt ruins
+                    ArrayList<MapLocation> emptyRuins = new ArrayList<>();
+                    // sense ruins
+                    MapLocation[] ruins = rc.senseNearbyRuins(-1);
+                    // for each
+                    for (int i = 0; i < ruins.length; i++) {
+                        // towers are a type of robot, this checks if there is a tower on the ruin
+                        if (rc.canSenseRobotAtLocation(ruins[i])) {
+                            RobotInfo tower = rc.senseRobotAtLocation(ruins[i]);
+                            // is it our our team
+                            if (tower.getTeam() == rc.getTeam()) {
+                                rc.setIndicatorString("found a freindly tower");
+
+                                // if its a paint tower
+                                if (tower.getType() == UnitType.LEVEL_ONE_PAINT_TOWER) {
+                                    // add it to the allied towers
+                                    if (!towers.contains(ruins[i])) {
+                                        towers.add(ruins[i]);
+                                    }
+                                }
+                            } else {
+                                // its an enemy tower
+                                rc.setIndicatorString("found an enemy tower");
+                                // add it to found enemies
+                                if (!foundE.contains(ruins[i])) {
+                                    foundE.add(ruins[i]);
+                                }
+                            }
+                        } else {
+                            // no tower, this is an empty ruin
+                            emptyRuins.add(ruins[i]);
+                        }
+                    }
+                    // did we find any empty ruins?
+                    if (emptyRuins.size() > 0) {
+                        rc.setIndicatorString("found a ruin!");
+
+                        // get closest ruin
+                        targetLoc = getClosest(rc, emptyRuins);
+                        // set it as the goal
+                        goal = targetLoc;
+                        justFound = true;
+                        unoptimalMoves = 0;
+                        // set the tower type we'll build
+                        if (rc.getMoney() < 1500) {
+                            goalType = UnitType.LEVEL_ONE_MONEY_TOWER;
+                        } else {
+                            goalType = UnitType.LEVEL_ONE_PAINT_TOWER;
+                        }
+                    }
+                } else if (targetLoc != null && rc.getLocation().isAdjacentTo(targetLoc)) {
+                    // if we are building
+
+                    // if the queue is empty
+                    if (paintNext.size() == 0 && rc.isActionReady()) {
+                        // maybe its a new find
+                        if (justFound) {
+                            // its not painted
+                            // get direction to the ruin
+                            Direction dir = rc.getLocation().directionTo(targetLoc);
+
+                            // the tile adjacent to the ruin on our side should be marked
+                            MapLocation shouldBeMarked = targetLoc.subtract(dir);
+                            // if no mark then mark
+                            if (rc.senseMapInfo(shouldBeMarked).getMark() == PaintType.EMPTY
+                                    && rc.canMarkTowerPattern(goalType, targetLoc)) {
+                                rc.markTowerPattern(goalType, targetLoc);
+                                System.out.println("Trying to build a tower at " + targetLoc);
+
+                            }
+                            // find nearby tiles
+                            paintNext = getLocationsWithinRadiusSquared(targetLoc, 8);
+                            justFound = false;
+                        } else {
+                            // this must be a known tower
+                            // maybe its already built
+                            // if another explorer built it for us
+                            if (rc.canSenseRobotAtLocation(targetLoc)) {
+                                System.out.println("Somoene else already built tower at " + targetLoc);
+
+                                // yay we created
+
+                                // now the task is to go back and refil on paint
+                                if (towers.size() > 0) {
+                                    // stop building, set the task to refil instead
+                                    task = 1;
+                                    goal = getClosest(rc, towers);
+                                } else {
+                                    // oh no, we dont know any towers
+                                    // task3 has us look for towers
+                                    task = 3;
+                                    // set a random goal
+                                    unoptimalMoves = 0;
+                                    goal = setFarthest(rc.getLocation(), 30);
+                                }
+                                // if applicable add this as a new paint tower
+                                if (rc.senseRobotAtLocation(targetLoc).getType() == UnitType.LEVEL_ONE_PAINT_TOWER) {
+                                    towers.add(targetLoc);
+                                }
+                                // reset target and reset built
+                                builtTower = null;
+                                targetLoc = null;
+                                paintNext.clear();
+                                // maybe we can build it
+                            } else if (rc.canSenseLocation(targetLoc.add(Direction.SOUTH).add(Direction.SOUTH))) {
+
+                                // if we can detect the type
+                                boolean paintTower = !rc
+                                        .senseMapInfo(targetLoc.add(Direction.SOUTH).add(Direction.SOUTH))
+                                        .getPaint()
+                                        .isSecondary();
+                                UnitType towerType;
+                                if (paintTower) {
+                                    towerType = UnitType.LEVEL_ONE_PAINT_TOWER;
+                                } else {
+                                    towerType = UnitType.LEVEL_ONE_MONEY_TOWER;
+
+                                }
+                                System.out.println("trying to build tower at " + targetLoc + " func says: "
+                                        + rc.canCompleteTowerPattern(towerType, targetLoc));
+
+                                if (rc.canCompleteTowerPattern(towerType, targetLoc)) {
+                                    System.out.println("built " + targetLoc);
+                                    // Complete the ruin if we can.
+                                    rc.completeTowerPattern(towerType, targetLoc);
+                                    // yay we created
+                                    // now the task is to go back and refil on paint
+                                    if (towers.size() > 0) {
+                                        // stop building, set the task to refil instead
+                                        task = 1;
+                                        goal = getClosest(rc, towers);
+                                    } else {
+                                        // oh no, we dont know any towers
+                                        // task3 has us look for towers
+                                        task = 3;
+                                        // set a random goal
+                                        unoptimalMoves = 0;
+                                        goal = setFarthest(rc.getLocation(), 30);
+                                    }
+                                    // if applicable add this as a new paint tower
+                                    if (paintTower) {
+                                        towers.add(targetLoc);
+                                    }
+                                    // reset target and set built
+                                    builtTower = targetLoc;
+                                    targetLoc = null;
+                                    // logs
+                                    rc.setTimelineMarker("Tower built", 0, 255, 0);
+                                    paintNext.clear();
+                                } else {
+                                    // we musve already built all the towers
+                                    maxTowers = true;
+                                }
+                            }
+                        }
+                    }
+                    if (task == 0 && paintNext.size() != 0 && targetLoc != null
+                            && rc.getLocation().isAdjacentTo(targetLoc)) {
+                        while (paintNext.size() > 0) {
+                            if (rc.canSenseLocation(paintNext.get(0))) {
+                                // get the tile
+                                MapInfo tile = rc.senseMapInfo(paintNext.get(0));
+                                // if it is incorreclty painted
+                                if (tile.getMark() != tile.getPaint()
+                                        && tile.getMark() != PaintType.EMPTY
+                                        && !tile.getPaint().isEnemy()) {
+                                    // get correct mark
+                                    boolean useSecondaryColor = tile.getMark() == PaintType.ALLY_SECONDARY;
+                                    // is within range
+                                    if (rc.getLocation().distanceSquaredTo(paintNext.get(0)) < attackRange) {
+                                        rc.setIndicatorString("painting " + paintNext.get(0));
+                                        // is in range, paint it
+                                        rc.attack(paintNext.get(0), useSecondaryColor);
+                                        // we're done paiting for this turn
+                                        break;
+                                    } else {
+                                        // not in range
+                                        Direction PatternTileDirection = moveTowards(rc, rc.getLocation(),
+                                                paintNext.get(0));
+                                        if (PatternTileDirection != null) {
+                                            // if moving would make it in range
+                                            if (paintNext.get(0).subtract(PatternTileDirection)
+                                                    .distanceSquaredTo(rc.getLocation()) < attackRange) {
+                                                rc.setIndicatorString("moving and painting");
+
+                                                // move twards
+                                                rc.move(PatternTileDirection);
+                                                // now its within range so paint it
+                                                rc.attack(paintNext.get(0), useSecondaryColor);
+                                                // we're done paiting for this turn
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            // this tile is outside sensing range, correctly painted, or too far, remove it
+                            paintNext.remove(0);
+                        }
+                    }
                 }
             }
-            // did we find any empty ruins?
-            if (emptyRuins.size() > 0) {
-                rc.setIndicatorString("found a ruin!");
 
-                // get closest ruin
-                targetLoc = getClosest(rc, emptyRuins);
-                // set it as the goal
-                goal = targetLoc;
-                unoptimalMoves = 0;
-                // set the tower type we'll build
-                if (rc.getMoney() < 1500) {
-                    goalType = UnitType.LEVEL_ONE_MONEY_TOWER;
-                } else {
-                    goalType = UnitType.LEVEL_ONE_PAINT_TOWER;
-                }
-            }
-        }
-        // if the queue is empty
-        if (paintNext.size() == 0 && rc.isActionReady() && task == 0 && targetLoc != null
-                && rc.getLocation().isAdjacentTo(targetLoc)) {
-            // maybe its already built
-            // if another explorer built it for us
-            if (rc.canSenseRobotAtLocation(targetLoc)) {
-                System.out.println("Somoene else already built tower at " + targetLoc);
-
-                // yay we created
-
-                // now the task is to go back and refil on paint
+            // if our paint is low, and we are building a tower
+            if (rc.getPaint() <= 100 && task == 0) {
+                rc.setIndicatorString("going to refil paint");
+                paintNext.clear();
+                // TODO: we need to ask others for tower locations if we have none(instead of
+                // erroring)
                 if (towers.size() > 0) {
                     // stop building, set the task to refil instead
                     task = 1;
@@ -594,165 +732,38 @@ public class RobotPlayer {
                     // task3 has us look for towers
                     task = 3;
                     // set a random goal
-                    unoptimalMoves = 0;
                     goal = setFarthest(rc.getLocation(), 30);
+                    unoptimalMoves = 0;
                 }
-                // if applicable add this as a new paint tower
-                if (rc.senseRobotAtLocation(targetLoc).getType() == UnitType.LEVEL_ONE_PAINT_TOWER) {
-                    towers.add(targetLoc);
-                }
-                // reset target and reset built
-                builtTower = null;
-                targetLoc = null;
-                paintNext.clear();
-                // maybe we can build it
-            } else if (rc.canSenseLocation(targetLoc.add(Direction.SOUTH).add(Direction.SOUTH))) {
+            }
 
+            // if we havent moved and we're not next to the destination then move
+            if (!goal.isAdjacentTo(rc.getLocation())) {
+                rc.setIndicatorString("moving twards destination");
 
-                // if we can detect the type
-                boolean paintTower = !rc.senseMapInfo(targetLoc.add(Direction.SOUTH).add(Direction.SOUTH))
-                        .getPaint()
-                        .isSecondary();
-                UnitType towerType;
-                if (paintTower) {
-                    towerType = UnitType.LEVEL_ONE_PAINT_TOWER;
+                // move twards destination
+                Direction dir = moveTowards(rc, rc.getLocation(), goal);
+                // if we got to this point theres no way we already moved
+                if (dir != null) {
+                    rc.move(dir);
                 } else {
-                    towerType = UnitType.LEVEL_ONE_MONEY_TOWER;
-
-                }                
-                System.out.println("trying to build tower at " + targetLoc + " func says: "+rc.canCompleteTowerPattern(towerType, targetLoc));
-
-                if (rc.canCompleteTowerPattern(towerType, targetLoc)) {
-                    System.out.println("built " + targetLoc);
-                    // Complete the ruin if we can.
-                    rc.completeTowerPattern(towerType, targetLoc);
-                    // yay we created
-                    // now the task is to go back and refil on paint
-                    if (towers.size() > 0) {
-                        // stop building, set the task to refil instead
-                        task = 1;
-                        goal = getClosest(rc, towers);
-                    } else {
-                        // oh no, we dont know any towers
-                        // task3 has us look for towers
-                        task = 3;
-                        // set a random goal
-                        unoptimalMoves = 0;
-                        goal = setFarthest(rc.getLocation(), 30);
-                    }
-                    // if applicable add this as a new paint tower
-                    if (paintTower) {
-                        towers.add(targetLoc);
-                    }
-                    // reset target and set built
-                    builtTower = targetLoc;
-                    targetLoc = null;
-                    // logs
-                    rc.setTimelineMarker("Tower built", 0, 255, 0);
-                    paintNext.clear();
-                } else {
-                    // its not painted
-                    // get direction to the ruin
-                    Direction dir = rc.getLocation().directionTo(targetLoc);
-
-                    // the tile adjacent to the ruin on our side should be marked
-                    MapLocation shouldBeMarked = targetLoc.subtract(dir);
-                    // if no mark then mark
-                    if (rc.senseMapInfo(shouldBeMarked).getMark() == PaintType.EMPTY
-                            && rc.canMarkTowerPattern(goalType, targetLoc)) {
-                        rc.markTowerPattern(goalType, targetLoc);
-                        System.out.println("Trying to build a tower at " + targetLoc);
-                    }
-
-                    // find nearby tiles
-                    paintNext = getLocationsWithinRadiusSquared(targetLoc, 8);
+                    unoptimalMoves += 1;
                 }
-
-            }
-        }
-        // if we are building
-        if (task == 0 && paintNext.size() != 0 && targetLoc != null && rc.getLocation().isAdjacentTo(targetLoc)) {
-
-            // since we shouldve just filled the qeueu if empty we dont need to check again
-            boolean attacked = false;
-
-            for (int i = 0; i < paintNext.size(); i++) {
-                if (rc.canSenseLocation(paintNext.get(i))) {
-                    // get the tile
-                    MapInfo tile = rc.senseMapInfo(paintNext.get(i));
-                    // if it is incorreclty painted
-                    if (tile.getMark() != tile.getPaint()
-                            && tile.getMark() != PaintType.EMPTY
-                            && !tile.getPaint().isEnemy()) {
-                        // get correct mark
-                        boolean useSecondaryColor = tile.getMark() == PaintType.ALLY_SECONDARY;
-                        // is within range
-                        if (rc.getLocation().distanceSquaredTo(paintNext.get(i)) < attackRange) {
-                            rc.setIndicatorString("painting " + paintNext.get(i));
-                            // is in range, paint it
-                            attacked = true;
-                            rc.attack(paintNext.get(i), useSecondaryColor);
-                            // we're done paiting for this turn
-                            break;
-                        } else {
-                            // not in range
-                            Direction PatternTileDirection = moveTowards(rc, rc.getLocation(),
-                            paintNext.get(i));
-                            if (PatternTileDirection != null) {
-                                // if moving would make it in range
-                                if (paintNext.get(i).subtract(PatternTileDirection)
-                                        .distanceSquaredTo(rc.getLocation()) < attackRange) {
-                                    rc.setIndicatorString("moving and painting");
-
-                                    // move twards
-                                    rc.move(PatternTileDirection);
-                                    // now its within range so paint it
-                                    attacked = true;
-
-                                    rc.attack(paintNext.get(i), useSecondaryColor);
-                                    // we're done paiting for this turn
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                // this tile is outside sensing range, correctly painted, or too far, remove it
-                paintNext.remove(i);
-                i--;
-
-            }
-            // if none of the tiles were paintable
-            if (attacked == false) {
-                // go back and find new tiles
-            }
-        }
-        // if we havent moved and we're not next to the destination then move
-        if (!goal.isAdjacentTo(rc.getLocation())) {
-            rc.setIndicatorString("moving twards destination");
-
-            // move twards destination
-            Direction dir = moveTowards(rc, rc.getLocation(), goal);
-            // if we got to this point theres no way we already moved
-            if (dir != null) {
-                rc.move(dir);
             } else {
-                unoptimalMoves += 1;
+                // we are already at destination
+                unoptimalMoves = 10;
             }
-        } else {
-            // we are already at destination
-            unoptimalMoves = 10;
-        }
-        // if we still havent used attack just paint below us
-        if (!rc.senseMapInfo(rc.getLocation()).getPaint().isAlly() && rc.canAttack(rc.getLocation())) {
-            rc.attack(rc.getLocation());
-        }
-        // if this goal isnt going anyware
-        if (unoptimalMoves > 3 && ((task == 0 && targetLoc == null) || task == 3)) {
-            rc.setIndicatorString("SETTING NEW GOAL");
+            // if we still havent used attack just paint below us
+            if (!rc.senseMapInfo(rc.getLocation()).getPaint().isAlly() && rc.canAttack(rc.getLocation())) {
+                rc.attack(rc.getLocation());
+            }
+            // if this goal isnt going anyware
+            if (unoptimalMoves > 3 && ((task == 0 && targetLoc == null) || task == 3)) {
+                rc.setIndicatorString("SETTING NEW GOAL");
 
-            unoptimalMoves = 0;
-            goal = setFarthest(rc.getLocation(), 30);
+                unoptimalMoves = 0;
+                goal = setFarthest(rc.getLocation(), 30);
+            }
         }
     }
 
