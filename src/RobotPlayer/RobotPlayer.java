@@ -31,7 +31,7 @@ public class RobotPlayer {
     static MapLocation builtTower = null;
     // store the MapLocation objects for found enemy towers
     static ArrayList<MapLocation> foundE = new ArrayList<>();
-    static boolean justFound = false;
+    static int justFound = 2;
 
     // when we start an exploration, we should start neer a paint tower and store it
     // here
@@ -402,7 +402,111 @@ public class RobotPlayer {
         // if we have built all towers
         if (maxTowers) {
             // we should attack
+            //if new or if no goal
+            if (task == -1 || goal == null) {
+                // set to closest enemy tower
+                if (foundE.size() > 0) {
+                    goal = getClosest(rc, foundE);
+                    // 0 = attack
+                    task = 0;
+                } else {
+                    // we need to find enemy towers
+                    // 1 = find
+                    task = 1;
+                    goal = setFarthest(rc.getLocation(), 50);
+                }
+            }
+            // defend ourselves
+            if (turnCount % 2 == 0 || enemiesNearby) {
+                bots nearbyBots = findNearbyBots(rc);
+                //lets check allies too
+                if(nearbyBots.allies.size() > 0){
+                    for (RobotInfo ally : nearbyBots.allies) {
+                        if (isPaintTower(ally.type) && !towers.contains(ally.getLocation())) {
+                            towers.add(ally.getLocation());
+                        }
+                    }
+                }
+                if (nearbyBots.enemies.size() > 0) {
+                    enemiesNearby = true;
+                    // Get a list of MapLocations
+                    ArrayList<MapLocation> mapLocations = new ArrayList<>();
+                    for (RobotInfo mapInfo : nearbyBots.enemies) {
+                        mapLocations.add(mapInfo.getLocation());
+                        if (mapInfo.type.isTowerType() && !foundE.contains(mapInfo.getLocation())) {
+                            goal = mapInfo.getLocation();
+                            foundE.add(mapInfo.getLocation());
+                        }
+                    }
+                    // attack closest
+                    MapLocation closest = getClosest(rc, mapLocations);
+                    if (rc.canAttack(closest)) {
+                        rc.attack(closest);
+                    }
+                } else {
+                    enemiesNearby = false;
+                }
+            }
+            // no one nearby
+            if (!enemiesNearby) {
+                // we can probably paint below us
+                if (!rc.senseMapInfo(rc.getLocation()).getPaint().isAlly() && rc.canAttack(rc.getLocation())) {
+                    rc.attack(rc.getLocation());
+                }
+            }
+            if (goal != null && rc.getLocation().isAdjacentTo(goal)) {
+                // we're at the goal
+                // if we are finding
+                if (task == 1) {
+                    // we failed to find
+                    // set a new goal
+                    goal = setFarthest(rc.getLocation(), 50);
+                } else if (task == 0) {
+                    // we are attacking
+                    // if we kiled the tower then remove it from the list and set a new goal
+                    if (!rc.canSenseRobotAtLocation(goal)) {
+                        goal = null;
+                    }
+                } else if (task == 2) {
+                    // we are refilling on paint
+                    if (rc.isActionReady()) {
+                        int paint = rc.senseRobotAtLocation(goal).getPaintAmount();
 
+                        // if its more than we need, then take the ammount we need
+                        if (paint >= 200 - rc.getPaint()) {
+                            rc.transferPaint(goal, -(200 - rc.getPaint()));
+                        } else if (paint > 0) {
+                            // if its less than we need, take it all
+                            rc.transferPaint(goal, -paint);
+                        }
+                        if (rc.getPaint() == 200) {
+                            goal = null;
+                            task = 0;
+                        }
+                    }
+                }
+
+            } else {
+                // move twards goal
+                Direction dir = moveTowards(rc, rc.getLocation(), goal);
+                if(dir != null){
+                rc.move(dir);
+                }
+            }
+            // if our paint is low, and we are building a tower
+            if (rc.getPaint() <= 100) {
+                rc.setIndicatorString("going to refil paint");
+                // TODO: we need to ask others for tower locations if we have none(instead of
+                // erroring)
+                if (towers.size() > 0) {
+                    // stop building, set the task to refil instead
+                    task = 2;
+                    goal = getClosest(rc, towers);
+                } else {
+                    // oh no, we dont know any towers
+                    // we're fucked
+                }
+            }
         } else {
             // task3 means we are looking for a paint tower so we can refil
             if (task == 3) {
@@ -420,7 +524,7 @@ public class RobotPlayer {
                                 rc.setIndicatorString("found a freindly tower2");
 
                                 // if its a paint tower
-                                if (tower.getType() == UnitType.LEVEL_ONE_PAINT_TOWER) {
+                                if (isPaintTower(tower.getType())) {
                                     // add it to the allied towers
                                     if (!towers.contains(ruins[i])) {
                                         towers.add(ruins[i]);
@@ -528,7 +632,7 @@ public class RobotPlayer {
                                 rc.setIndicatorString("found a freindly tower");
 
                                 // if its a paint tower
-                                if (tower.getType() == UnitType.LEVEL_ONE_PAINT_TOWER) {
+                                if (isPaintTower(tower.getType())) {
                                     // add it to the allied towers
                                     if (!towers.contains(ruins[i])) {
                                         towers.add(ruins[i]);
@@ -555,7 +659,7 @@ public class RobotPlayer {
                         targetLoc = getClosest(rc, emptyRuins);
                         // set it as the goal
                         goal = targetLoc;
-                        justFound = true;
+                        justFound = 2;
                         unoptimalMoves = 0;
                         // set the tower type we'll build
                         if (rc.getMoney() < 1500) {
@@ -570,7 +674,7 @@ public class RobotPlayer {
                     // if the queue is empty
                     if (paintNext.size() == 0 && rc.isActionReady()) {
                         // maybe its a new find
-                        if (justFound) {
+                        if (justFound > 0) {
                             // its not painted
                             // get direction to the ruin
                             Direction dir = rc.getLocation().directionTo(targetLoc);
@@ -586,8 +690,11 @@ public class RobotPlayer {
                             }
                             // find nearby tiles
                             paintNext = getLocationsWithinRadiusSquared(targetLoc, 8);
-                            justFound = false;
-                        } else {
+                            justFound -= 1;
+                        } else if(rc.getChips() < 1000){
+                            //we dont have enoguht chips
+                            //just do nothing until we have enough
+                        }else {
                             // this must be a known tower
                             // maybe its already built
                             // if another explorer built it for us
@@ -610,7 +717,7 @@ public class RobotPlayer {
                                     goal = setFarthest(rc.getLocation(), 30);
                                 }
                                 // if applicable add this as a new paint tower
-                                if (rc.senseRobotAtLocation(targetLoc).getType() == UnitType.LEVEL_ONE_PAINT_TOWER) {
+                                if (isPaintTower(rc.senseRobotAtLocation(targetLoc).getType())) {
                                     towers.add(targetLoc);
                                 }
                                 // reset target and reset built
@@ -632,8 +739,6 @@ public class RobotPlayer {
                                     towerType = UnitType.LEVEL_ONE_MONEY_TOWER;
 
                                 }
-                                System.out.println("trying to build tower at " + targetLoc + " func says: "
-                                        + rc.canCompleteTowerPattern(towerType, targetLoc));
 
                                 if (rc.canCompleteTowerPattern(towerType, targetLoc)) {
                                     System.out.println("built " + targetLoc);
@@ -666,6 +771,8 @@ public class RobotPlayer {
                                 } else {
                                     // we musve already built all the towers
                                     maxTowers = true;
+                                    task = -1;
+                                    targetLoc = null;
                                 }
                             }
                         }
@@ -837,7 +944,7 @@ public class RobotPlayer {
                 // freinds
                 for (int i = 0; i < nearbyBots.allies.size(); i++) {
                     RobotInfo ally = nearbyBots.allies.get(i);
-                    if (ally.getType() == UnitType.LEVEL_ONE_PAINT_TOWER && !towers.contains(ally.getLocation())) {
+                    if (isPaintTower(ally.getType()) && !towers.contains(ally.getLocation())) {
                         rc.setIndicatorString("added allied tower");
                         towers.add(ally.getLocation());
                     } else if (ally.getType() == UnitType.SOLDIER) {
@@ -919,7 +1026,9 @@ public class RobotPlayer {
         }
 
     }
-
+    public static boolean isPaintTower(UnitType unit){
+        return unit == UnitType.LEVEL_ONE_PAINT_TOWER || unit == UnitType.LEVEL_TWO_PAINT_TOWER || unit == UnitType.LEVEL_THREE_PAINT_TOWER;
+    }
     // returns an enemy and allied bots arrays
     public static bots findNearbyBots(RobotController rc) throws GameActionException {
         // find nearby robots
