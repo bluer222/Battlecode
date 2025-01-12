@@ -362,6 +362,9 @@ public class RobotPlayer {
 
             botQueue.add(rng.nextInt(3) + 1);
         }
+        if(botQueue.isEmpty() && rc.getMoney() > 5000 && rc.getPaint() >= 100 && isMoneyTower(rc.getType())){
+            botQueue.add(2);
+        }
         if (!botQueue.isEmpty()) {
             // sometimes someone takes
 
@@ -468,20 +471,34 @@ public class RobotPlayer {
                         goal = null;
                     }
                 } else if (task == 2) {
-                    // we are refilling on paint
-                    if (rc.isActionReady()) {
-                        int paint = rc.senseRobotAtLocation(goal).getPaintAmount();
-
-                        // if its more than we need, then take the ammount we need
-                        if (paint >= 200 - rc.getPaint()) {
-                            rc.transferPaint(goal, -(200 - rc.getPaint()));
-                        } else if (paint > 0) {
-                            // if its less than we need, take it all
-                            rc.transferPaint(goal, -paint);
+                    if (!rc.canSenseRobotAtLocation(goal)) {
+                        // oh no the tower got destroyed
+                        towers.remove(goal);
+                        if (towers.size() > 0) {
+                            // stop building, set the task to refil instead
+                            task = 2;
+                            goal = getClosest(rc, towers);
+                        } else {
+                            // oh no, we dont know any towers
+                            // we're fucked
                         }
-                        if (rc.getPaint() == 200) {
-                            goal = null;
-                            task = 0;
+
+                    } else {
+                        // we are refilling on paint
+                        if (rc.isActionReady()) {
+                            int paint = rc.senseRobotAtLocation(goal).getPaintAmount();
+
+                            // if its more than we need, then take the ammount we need
+                            if (paint >= 200 - rc.getPaint()) {
+                                rc.transferPaint(goal, -(200 - rc.getPaint()));
+                            } else if (paint > 0) {
+                                // if its less than we need, take it all
+                                rc.transferPaint(goal, -paint);
+                            }
+                            if (rc.getPaint() == 200) {
+                                goal = null;
+                                task = 0;
+                            }
                         }
                     }
                 }
@@ -548,30 +565,47 @@ public class RobotPlayer {
                 // task2 means we have 0.built 1.came back+reported and finally now we're
                 // refilling
                 if (turnCount % 2 == 0) {
-                    rc.setIndicatorString("refilling paint");
-                    // since we just went over to the tower to report, we're already adjacent so we
-                    // can transfer
-                    // check how much paint the tower has
-                    int paint = rc.senseRobotAtLocation(goal).getPaintAmount();
-                    if (rc.isActionReady()) {
-                        // if its more than we need, then take the ammount we need
-                        if (paint >= 200 - rc.getPaint()) {
-                            rc.transferPaint(goal, -(200 - rc.getPaint()));
-                        } else if (paint > 0) {
-                            // if its less than we need, take it all
-                            rc.transferPaint(goal, -paint);
-
-                        }
-                    }
-                    // if our paint is good enogh
-                    if (rc.getPaint() > 170) {
-                        // task = 0 means we will go and explore again
-                        task = 0;
-                        if (targetLoc != null) {
-                            goal = targetLoc;
+                    if (!rc.canSenseRobotAtLocation(goal)) {
+                        // the tower got destroyed
+                        towers.remove(goal);
+                        if (towers.size() > 0) {
+                            // stop building, set the task to refil instead
+                            task = 1;
+                            goal = getClosest(rc, towers);
                         } else {
+                            // oh no, we dont know any towers
+                            // task3 has us look for towers
+                            task = 3;
+                            // set a random goal
                             goal = setFarthest(rc.getLocation(), 30);
+                            unoptimalMoves = 0;
+                        }
+                    } else {
+                        rc.setIndicatorString("refilling paint");
+                        // since we just went over to the tower to report, we're already adjacent so we
+                        // can transfer
+                        // check how much paint the tower has
+                        int paint = rc.senseRobotAtLocation(goal).getPaintAmount();
+                        if (rc.isActionReady()) {
+                            // if its more than we need, then take the ammount we need
+                            if (paint >= 200 - rc.getPaint()) {
+                                rc.transferPaint(goal, -(200 - rc.getPaint()));
+                            } else if (paint > 0) {
+                                // if its less than we need, take it all
+                                rc.transferPaint(goal, -paint);
 
+                            }
+                        }
+                        // if our paint is good enogh
+                        if (rc.getPaint() > 170) {
+                            // task = 0 means we will go and explore again
+                            task = 0;
+                            if (targetLoc != null) {
+                                goal = targetLoc;
+                            } else {
+                                goal = setFarthest(rc.getLocation(), 30);
+
+                            }
                         }
                     }
                 }
@@ -785,7 +819,7 @@ public class RobotPlayer {
                                 MapInfo tile = rc.senseMapInfo(paintNext.get(i));
                                 // if its enemy
                                 if (tile.getPaint().isEnemy() && tile.getMark() != PaintType.EMPTY) {
-                                    //do nothing
+                                    // do nothing
                                 } else if (tile.getMark() != tile.getPaint() && tile.getMark() != PaintType.EMPTY) {
                                     // if it is incorreclty painted
                                     // get correct mark
@@ -826,7 +860,7 @@ public class RobotPlayer {
                                             i--;
                                         }
                                     }
-                                }else {
+                                } else {
                                     // this tile is outside sensing range, correctly painted, or too far, remove
                                     // it
                                     paintNext.remove(i);
@@ -919,6 +953,8 @@ public class RobotPlayer {
         // update the robot we're following
         if (following != null && rc.canSenseRobot(followingID)) {
             following = rc.senseRobot(followingID);
+        } else {
+            following = null;
         }
         // if low on paint
         if (goal != null) {
@@ -930,27 +966,35 @@ public class RobotPlayer {
                 }
             }
             if (rc.getLocation().isAdjacentTo(goal)) {
-                // check how much paint the tower has
-                int paint = rc.senseRobotAtLocation(goal).getPaintAmount();
-                if (rc.isActionReady()) {
-                    if (rc.getChips() > 5000 && rc.canUpgradeTower(goal)) {
-                        rc.upgradeTower(goal);
-                    } else {
-                        // if its more than we need, then take the ammount we need
-                        if (paint >= 100 - rc.getPaint()) {
-                            rc.transferPaint(goal, -(100 - rc.getPaint()));
-                        } else if (paint > 0) {
-                            // if its less than we need, take it all
-                            rc.transferPaint(goal, -paint);
+                if (!rc.canSenseRobotAtLocation(goal)) {
+                    // the tower got destroyed
+                    towers.remove(goal);
+                    if (towers.size() > 0) {
+                        goal = getClosest(rc, towers);
+                    }
+                } else {
+                    // check how much paint the tower has
+                    int paint = rc.senseRobotAtLocation(goal).getPaintAmount();
+                    if (rc.isActionReady()) {
+                        if (rc.getChips() > 5000 && rc.canUpgradeTower(goal)) {
+                            rc.upgradeTower(goal);
+                        } else {
+                            // if its more than we need, then take the ammount we need
+                            if (paint >= 100 - rc.getPaint()) {
+                                rc.transferPaint(goal, -(100 - rc.getPaint()));
+                            } else if (paint > 0) {
+                                // if its less than we need, take it all
+                                rc.transferPaint(goal, -paint);
+                            }
                         }
                     }
-                }
 
-                // if our paint is full
-                if (rc.getPaint() == 100) {
-                    // goal null means we will behave normally
-                    goal = null;
+                    // if our paint is full
+                    if (rc.getPaint() == 100) {
+                        // goal null means we will behave normally
+                        goal = null;
 
+                    }
                 }
             }
 
@@ -1048,6 +1092,10 @@ public class RobotPlayer {
     public static boolean isPaintTower(UnitType unit) {
         return unit == UnitType.LEVEL_ONE_PAINT_TOWER || unit == UnitType.LEVEL_TWO_PAINT_TOWER
                 || unit == UnitType.LEVEL_THREE_PAINT_TOWER;
+    }
+    public static boolean isMoneyTower(UnitType unit) {
+        return unit == UnitType.LEVEL_ONE_MONEY_TOWER || unit == UnitType.LEVEL_TWO_MONEY_TOWER
+                || unit == UnitType.LEVEL_THREE_MONEY_TOWER;
     }
 
     // returns an enemy and allied bots arrays
