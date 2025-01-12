@@ -1,3 +1,11 @@
+why are so many bytecodes used on the turn that finishes the tower
+
+instead of checking for tiles to paint every turn, check every other turn and store a paintnext location(or maybe multiple)
+
+every time movement goes in an unoptimal direction, increment variable if grater than 3 then make a new goal
+
+towers should upgrade themselves when there are tons of tokens
+
 Types:
 soliders:
 soliders can be explorers/builders, goes out until find ruin or enemy tower, if enemy tower go back and report, if ruin then calculate, if we can build this and still make it back we should, we can also tell splashers to claim a line from a known tower to that one, if we cant we should go back, replenish, then build it(should we ask other builders to come too?, idk)
