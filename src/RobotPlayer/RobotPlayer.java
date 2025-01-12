@@ -56,6 +56,8 @@ public class RobotPlayer {
     static UnitType botType;
     // if we are a mopper this is the soldier we are following
     static RobotInfo following = null;
+    // this is the id of that soldier
+    static int followingID;
 
     static double attackRange;
     static int paintCapacity;
@@ -382,19 +384,59 @@ public class RobotPlayer {
     public static void runSoldier(RobotController rc) throws GameActionException {
         // if our paint is low, and we are building a tower
         if (rc.getPaint() <= 100 && task == 0) {
-            // stop building, set the task to refil instead
             rc.setIndicatorString("going to refil paint");
-            task = 1;
             // TODO: we need to ask others for tower locations if we have none(instead of
             // erroring)
-            goal = getClosest(rc, towers);
+            if (towers.size() > 0) {
+                // stop building, set the task to refil instead
+                task = 1;
+                goal = getClosest(rc, towers);
+            } else {
+                // oh no, we dont know any towers
+                // task3 has us look for towers
+                task = 3;
+                // set a random goal
+                goal = setFarthest(rc.getLocation(), 30);
+            }
         }
         // set our indicator to the task for debug
         rc.setIndicatorString(Integer.toString(task));
+        // task3 means we are looking for a paint tower so we can refil
+        if (task == 3) {
+            // sense ruins
+            MapLocation[] ruins = rc.senseNearbyRuins(-1);
+            // for each
+            for (int i = 0; i < ruins.length; i++) {
+                // towers are a type of robot, this checks if there is a tower on the ruin
+                if (rc.canSenseRobotAtLocation(ruins[i])) {
+                    RobotInfo tower = rc.senseRobotAtLocation(ruins[i]);
+                    // is it our our team
+                    if (tower.getTeam() == rc.getTeam()) {
+                        rc.setIndicatorString("found a freindly tower");
 
-        // task2 means we have 0.built 1.came back+reported and finally now we're
-        // refilling
-        if (task == 2) {
+                        // if its a paint tower
+                        if (tower.getType() == UnitType.LEVEL_ONE_PAINT_TOWER) {
+                            // add it to the allied towers
+                            if (!towers.contains(ruins[i])) {
+                                towers.add(ruins[i]);
+                                // yay we can get paint now
+                                goal = ruins[i];
+                                task = 1;
+                            }
+                        }
+                    } else {
+                        // its an enemy tower
+                        rc.setIndicatorString("found an enemy tower");
+                        // add it to found enemies
+                        if (!foundE.contains(ruins[i])) {
+                            foundE.add(ruins[i]);
+                        }
+                    }
+                }
+            }
+        } else if (task == 2) {
+            // task2 means we have 0.built 1.came back+reported and finally now we're
+            // refilling
             rc.setIndicatorString("refilling paint");
             // since we just went over to the tower to report, we're already adjacent so we
             // can transfer
@@ -403,7 +445,7 @@ public class RobotPlayer {
             // if its more than we need, then take the ammount we need
             if (paint >= paintCapacity - rc.getPaint()) {
                 rc.transferPaint(goal, -(paintCapacity - rc.getPaint()));
-            } else {
+            } else if (paint > 0) {
                 // if its less than we need, take it all
                 rc.transferPaint(goal, -paint);
             }
@@ -430,7 +472,7 @@ public class RobotPlayer {
                         task = 2;
                     }
                 } else {
-                    // we mush just be refilling
+                    // we must just be refilling
                     task = 2;
                 }
             }
@@ -481,7 +523,7 @@ public class RobotPlayer {
                 // set it as the goal
                 goal = targetLoc;
                 // set the tower type we'll build
-                if (rng.nextInt(2) == 0) {
+                if (rc.getID()%2 == 0) {
                     goalType = UnitType.LEVEL_ONE_PAINT_TOWER;
                 } else {
                     goalType = UnitType.LEVEL_ONE_MONEY_TOWER;
@@ -596,100 +638,110 @@ public class RobotPlayer {
      * loop in run(), so it is called once per turn.
      */
     public static void runMopper(RobotController rc) throws GameActionException {
-        //if low on paint
-        if(goal != null){
-            //go twards tower
-            if(!rc.getLocation().isAdjacentTo(goal)){
-            Direction dir = moveTowards(rc, rc.getLocation(), goal);
-            rc.move(dir);    
-        }
-        if(rc.getLocation().isAdjacentTo(goal)){
-           // check how much paint the tower has
-           int paint = rc.senseRobotAtLocation(goal).getPaintAmount();
-           // if its more than we need, then take the ammount we need
-           if (paint >= paintCapacity - rc.getPaint()) {
-               rc.transferPaint(goal, -(paintCapacity - rc.getPaint()));
-           } else {
-               // if its less than we need, take it all
-               rc.transferPaint(goal, -paint);
-           }
-           // if our paint is full
-           if (rc.getPaint() == paintCapacity) {
-               //goal = null means we will behave normally
-               goal = null;
-           }  
-        }
-
-        
-        }else{
-        // once every 3 turns
-        if (turnCount % 2 == 0) {
-            // sense nearby bots
-            bots nearbyBots = findNearbyBots(rc);
-            // freinds
-            for (int i = 0; i < nearbyBots.allies.size(); i++) {
-                RobotInfo ally = nearbyBots.allies.get(i);
-                if (ally.getType() == UnitType.LEVEL_ONE_PAINT_TOWER && !towers.contains(ally.getLocation())) {
-                    rc.setIndicatorString("added allied tower");
-                    towers.add(ally.getLocation());
-                } else if (ally.getType() == UnitType.SOLDIER) {
-                    // lets follow the explorer
-                        rc.setIndicatorString("following ally");
-
-                        following = ally;
-                }
-            }
-        }
-        // once every 2 turns
-        if (turnCount % 2 == 0 && tileToClear == null) {
-            // sense nearby tiles
-            for (MapInfo patternTile : rc.senseNearbyMapInfos()) {
-                // if it has a mark and is enemy
-                if (patternTile.getMark() != PaintType.EMPTY && patternTile.getPaint().isEnemy()) {
-                    rc.setIndicatorString("founed tile need to clear");
-                    tileToClear = patternTile.getMapLocation();
-                   
-                }
-            }
-
-        }
-        if(tileToClear != null){
-            if(rc.getLocation().isAdjacentTo(tileToClear)){
-                //mop it
-                if(rc.canAttack(tileToClear)){
-                rc.attack(tileToClear);
-                tileToClear = null;
-                }
-            }else{
-                //if too far then move twards it
-                Direction dir = moveTowards(rc, rc.getLocation(), tileToClear);
+        // if low on paint
+        if (goal != null) {
+            // go twards tower
+            if (!rc.getLocation().isAdjacentTo(goal)) {
+                Direction dir = moveTowards(rc, rc.getLocation(), goal);
                 if (dir != null) {
                     rc.move(dir);
                 }
-                //check if we're close enough now
-                if(rc.getLocation().isAdjacentTo(tileToClear)){
-                    //mop it
-                    if(rc.canAttack(tileToClear)){
-                    rc.attack(tileToClear);
-                    tileToClear = null;
+            }
+            if (rc.getLocation().isAdjacentTo(goal)) {
+                // check how much paint the tower has
+                int paint = rc.senseRobotAtLocation(goal).getPaintAmount();
+                // if its more than we need, then take the ammount we need
+                if (paint >= paintCapacity - rc.getPaint()) {
+                    rc.transferPaint(goal, -(paintCapacity - rc.getPaint()));
+                } else if (paint > 0) {
+                    // if its less than we need, take it all
+                    rc.transferPaint(goal, -paint);
+                }
+                // if our paint is full
+                if (rc.getPaint() == paintCapacity) {
+                    // goal = null means we will behave normally
+                    goal = null;
+                }
+            }
+
+        } else {
+            // once every 3 turns
+            if (turnCount % 2 == 0) {
+                // sense nearby bots
+                bots nearbyBots = findNearbyBots(rc);
+                // freinds
+                for (int i = 0; i < nearbyBots.allies.size(); i++) {
+                    RobotInfo ally = nearbyBots.allies.get(i);
+                    if (ally.getType() == UnitType.LEVEL_ONE_PAINT_TOWER && !towers.contains(ally.getLocation())) {
+                        rc.setIndicatorString("added allied tower");
+                        towers.add(ally.getLocation());
+                    } else if (ally.getType() == UnitType.SOLDIER) {
+                        if (following == null || followingID == ally.getID()) {
+                            // lets follow the explorer
+                            rc.setIndicatorString("following ally");
+
+                            following = ally;
+                            followingID = ally.getID();
+                        }
                     }
                 }
             }
-        }else{
-            //if nothing to clear then follow
-            Direction dir = moveTowards(rc, rc.getLocation(), following.getLocation());
-            rc.move(dir);
+            // once every 2 turns
+            if (turnCount % 2 == 0 && tileToClear == null) {
+                // sense nearby tiles
+                for (MapInfo patternTile : rc.senseNearbyMapInfos()) {
+                    // if it has a mark and is enemy
+                    if (patternTile.getMark() != PaintType.EMPTY && patternTile.getPaint().isEnemy()) {
+                        rc.setIndicatorString("founed tile need to clear");
+                        tileToClear = patternTile.getMapLocation();
+
+                    }
+                }
+
+            }
+            if (tileToClear != null) {
+                if (rc.getLocation().isAdjacentTo(tileToClear)) {
+                    // mop it
+                    if (rc.canAttack(tileToClear)) {
+                        rc.attack(tileToClear);
+                        tileToClear = null;
+                    }
+                } else {
+                    // if too far then move twards it
+                    Direction dir = moveTowards(rc, rc.getLocation(), tileToClear);
+                    if (dir != null) {
+                        rc.move(dir);
+                    }
+                    // check if we're close enough now
+                    if (rc.getLocation().isAdjacentTo(tileToClear)) {
+                        // mop it
+                        if (rc.canAttack(tileToClear)) {
+                            rc.attack(tileToClear);
+                            tileToClear = null;
+                        }
+                    }
+                }
+            } else {
+                if (following != null) {
+                    // if nothing to clear then follow
+                    Direction dir = moveTowards(rc, rc.getLocation(), following.getLocation());
+                    if (dir != null) {
+                        rc.move(dir);
+                    }
+                }
+            }
         }
-    }
-    if(rc.getPaint() <= 50){
-        goal = getClosest(rc, towers);
-    }
+        if (rc.getPaint() <= 50) {
+            if (towers.size() > 0) {
+                goal = getClosest(rc, towers);
+            }
+        }
         // mop swint randomly.
-        //Direction dir = directions[rng.nextInt(directions.length)];
-        //if (rc.canMopSwing(dir)) {
-        //    rc.mopSwing(dir);
-        //    System.out.println("Mop Swing! Booyah!");
-        //}
+        // Direction dir = directions[rng.nextInt(directions.length)];
+        // if (rc.canMopSwing(dir)) {
+        // rc.mopSwing(dir);
+        // System.out.println("Mop Swing! Booyah!");
+        // }
     }
 
     static class bots {
