@@ -687,20 +687,20 @@ public class RobotPlayer {
                         // get correct mark
                         boolean useSecondaryColor = tile.getMark() == PaintType.ALLY_SECONDARY;
                         // is within range
-                        if (rc.getLocation().distanceSquaredTo(tile.getMapLocation()) < attackRange) {
-                            rc.setIndicatorString("painting " + tile.getMapLocation());
+                        if (rc.getLocation().distanceSquaredTo(paintNext.get(i)) < attackRange) {
+                            rc.setIndicatorString("painting " + paintNext.get(i));
                             // is in range, paint it
                             attacked = true;
-                            rc.attack(tile.getMapLocation(), useSecondaryColor);
+                            rc.attack(paintNext.get(i), useSecondaryColor);
                             // we're done paiting for this turn
                             break;
                         } else {
                             // not in range
                             Direction PatternTileDirection = moveTowards(rc, rc.getLocation(),
-                                    tile.getMapLocation());
+                            paintNext.get(i));
                             if (PatternTileDirection != null) {
                                 // if moving would make it in range
-                                if (tile.getMapLocation().subtract(PatternTileDirection)
+                                if (paintNext.get(i).subtract(PatternTileDirection)
                                         .distanceSquaredTo(rc.getLocation()) < attackRange) {
                                     rc.setIndicatorString("moving and painting");
 
@@ -709,7 +709,7 @@ public class RobotPlayer {
                                     // now its within range so paint it
                                     attacked = true;
 
-                                    rc.attack(tile.getMapLocation(), useSecondaryColor);
+                                    rc.attack(paintNext.get(i), useSecondaryColor);
                                     // we're done paiting for this turn
                                     break;
                                 }
@@ -719,6 +719,7 @@ public class RobotPlayer {
                 }
                 // this tile is outside sensing range, correctly painted, or too far, remove it
                 paintNext.remove(i);
+                i--;
 
             }
             // if none of the tiles were paintable
