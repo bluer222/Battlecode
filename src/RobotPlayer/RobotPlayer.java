@@ -13,14 +13,7 @@ import java.util.Random;
 
 public class RobotPlayer {
 
-    /*
-     * This RNG to make some random
-     * moves. The Random class is provided by the java.util.Random import at the
-     * top of this file. Here, we *seed* the RNG with a constant number (6147);
-     * this makes sure we get the same sequence of numbers every time this code
-     * is run. This is very useful for debugging!
-     */
-    static final Random rng = new Random(3456);
+
 
     /**
      * We will use this variable to count the number of turns this robot has
@@ -52,7 +45,7 @@ public class RobotPlayer {
 
     // we must define these variables here so they will be global
     static MapLocation goal = null;
-    //when the goal was created
+    // when the goal was created
     static int goalCreationDate;
 
     static boolean isOriginal;
@@ -63,10 +56,9 @@ public class RobotPlayer {
     static int followingID;
 
     static double attackRange;
-    static int paintCapacity;
     static int mapWidth;
     static int mapHeight;
-
+    static Random rng;
     // 0 = explore, 1 = come home, 2 = get paint
     static int task = 0;
 
@@ -78,7 +70,7 @@ public class RobotPlayer {
 
     static MapLocation targetLoc = null;
     // the type of tower we're building
-    static UnitType goalType = null;
+    static UnitType goalType = UnitType.LEVEL_ONE_PAINT_TOWER;
 
     // were enemies seen last time we checked
     static boolean enemiesNearby = false;
@@ -109,6 +101,14 @@ public class RobotPlayer {
      *
      */
     public static void run(RobotController rc) throws GameActionException {
+            /*
+     * This RNG to make some random
+     * moves. The Random class is provided by the java.util.Random import at the
+     * top of this file. Here, we *seed* the RNG with a constant number (6147);
+     * this makes sure we get the same sequence of numbers every time this code
+     * is run. This is very useful for debugging!
+     */
+    rng = new Random(rc.getID());
         mapHeight = rc.getMapHeight();
         mapWidth = rc.getMapWidth();
         // Hello world! Standard output is very useful for debugging.
@@ -133,15 +133,12 @@ public class RobotPlayer {
         if (botType == UnitType.SPLASHER || botType == UnitType.LEVEL_ONE_MONEY_TOWER
                 || botType == UnitType.LEVEL_ONE_PAINT_TOWER) {
             attackRange = 9;
-            paintCapacity = 300;
         } else if (botType == UnitType.SOLDIER || botType == UnitType.LEVEL_ONE_DEFENSE_TOWER) {
             // sqrt 20
             attackRange = 9;
-            paintCapacity = 200;
         } else if (botType == UnitType.MOPPER) {
             // sqrt 2
             attackRange = 2;
-            paintCapacity = 100;
         }
         while (true) {
             // This code runs during the entire lifespan of the robot, which is why it is in
@@ -210,7 +207,10 @@ public class RobotPlayer {
     // returns the closest location
     public static MapLocation getClosest(RobotController rc, ArrayList<MapLocation> locations)
             throws GameActionException {
-        int smallest = 100000;
+        if (locations.size() == 0) {
+            return null;
+        }
+        int smallest = 10000000;
         MapLocation closest = locations.get(0);
         for (int i = 0; i < locations.size(); i++) {
             MapLocation loc = locations.get(i);
@@ -314,7 +314,8 @@ public class RobotPlayer {
                 // send every message
                 for (Message m : messageQueue) {
                     // only send if they are not the source(this will save some message sends)
-                    if (ally.getID() != m.getSenderID() && messageCount < 20) {
+                    if (ally.getID() != m.getSenderID() && messageCount < 20
+                            && rc.canSendMessage(ally.getLocation(), m.getBytes())) {
                         rc.sendMessage(ally.getLocation(), m.getBytes());
                         messageCount += 1;
                     }
@@ -341,7 +342,19 @@ public class RobotPlayer {
 
             }
         }
+        // finally, we add more bots to the queue if empty and enough chips and enough
+        // paint
+        // this artificially makes all bots as expensive as the most expensive bot
+        // this way we wont only get moppers(normally if one tower chooses a mopper it
+        // will always ge tot build first since moppers are cheaper)
+        if (botQueue.isEmpty() && rc.getMoney() - 1000 > 400 && rc.getPaint() >= 300) {
+            rc.setIndicatorString("added bot to queue messages");
+
+            botQueue.add(rng.nextInt(3) + 1);
+        }
         if (!botQueue.isEmpty()) {
+            // sometimes someone takes
+
             rc.setIndicatorString("building bots");
 
             // Pick a direction to build in.
@@ -367,17 +380,6 @@ public class RobotPlayer {
                 botQueue.remove(0);
             }
         }
-        // finally, we add more bots to the queue if empty and enough chips and enough
-        // paint
-        // this artificially makes all bots as expensive as the most expensive bot
-        // this way we wont only get moppers(normally if one tower chooses a mopper it
-        // will always ge tot build first since moppers are cheaper)
-        if (botQueue.isEmpty() && rc.getMoney() - 1000 > 400 && rc.getPaint() >= 300) {
-            rc.setIndicatorString("added bot to queue messages");
-
-            botQueue.add(rng.nextInt(3) + 1);
-        }
-
     }
 
     /**
@@ -407,7 +409,7 @@ public class RobotPlayer {
         rc.setIndicatorString(Integer.toString(task));
         // task3 means we are looking for a paint tower so we can refil
         if (task == 3) {
-            if(turnCount-goalCreationDate > 10){
+            if (turnCount - goalCreationDate > 10) {
                 goalCreationDate = turnCount;
                 goal = setFarthest(rc.getLocation(), 30);
             }
@@ -450,15 +452,18 @@ public class RobotPlayer {
             // can transfer
             // check how much paint the tower has
             int paint = rc.senseRobotAtLocation(goal).getPaintAmount();
-            // if its more than we need, then take the ammount we need
-            if (paint >= paintCapacity - rc.getPaint()) {
-                rc.transferPaint(goal, -(paintCapacity - rc.getPaint()));
-            } else if (paint > 0) {
-                // if its less than we need, take it all
-                rc.transferPaint(goal, -paint);
+            if (rc.isActionReady()) {
+                // if its more than we need, then take the ammount we need
+                if (paint >= 200 - rc.getPaint()) {
+                    rc.transferPaint(goal, -(200 - rc.getPaint()));
+                } else if (paint > 0) {
+                    // if its less than we need, take it all
+                    rc.transferPaint(goal, -paint);
+
+                }
             }
             // if our paint is full
-            if (rc.getPaint() == paintCapacity) {
+            if (rc.getPaint() == 200) {
                 // task = 0 means we will go and explore again
                 task = 0;
                 goal = null;
@@ -477,15 +482,27 @@ public class RobotPlayer {
                     if (rc.canSendMessage(goal)) {
                         rc.sendMessage(goal, buildMessage(1, builtTower));
                         builtTower = null;
-                        task = 2;
+                        if (rc.getPaint() != 200) {
+                            task = 2;
+                        } else {
+                            // task = 0 means we will go and explore again
+                            task = 0;
+                            goal = null;
+                        }
                     }
                 } else {
                     // we must just be refilling
-                    task = 2;
+                    if (rc.getPaint() != 200) {
+                        task = 2;
+                    } else {
+                        // task = 0 means we will go and explore again
+                        task = 0;
+                        goal = null;
+                    }
                 }
             }
         } else if (task == 0 && targetLoc == null) {
-            if(turnCount-goalCreationDate > 10){
+            if (turnCount - goalCreationDate > 10) {
                 goalCreationDate = turnCount;
                 goal = setFarthest(rc.getLocation(), 30);
             }
@@ -535,11 +552,10 @@ public class RobotPlayer {
                 // set it as the goal
                 goal = targetLoc;
                 // set the tower type we'll build
-                if (rc.getID()%2 == 0) {
+                if (rc.getID() % 2 == 0) {
                     goalType = UnitType.LEVEL_ONE_PAINT_TOWER;
                 } else {
                     goalType = UnitType.LEVEL_ONE_MONEY_TOWER;
-
                 }
             }
         } else if (task == 0 && rc.getLocation().isAdjacentTo(targetLoc)) {
@@ -592,15 +608,47 @@ public class RobotPlayer {
                     }
                 }
             }
-            // Complete the ruin if we can.
-            if (rc.canCompleteTowerPattern(goalType, targetLoc)) {
+            // if another explorer built it for us
+            if (rc.canSenseRobotAtLocation(targetLoc)) {
+                // yay we created
+
+                // now the task is to go back and refil on paint
+                if (towers.size() > 0) {
+                    // stop building, set the task to refil instead
+                    task = 1;
+                    goal = getClosest(rc, towers);
+                } else {
+                    // oh no, we dont know any towers
+                    // task3 has us look for towers
+                    task = 3;
+                    // set a random goal
+                    goalCreationDate = turnCount;
+                    goal = setFarthest(rc.getLocation(), 30);
+                }
+                // if applicable add this as a new paint tower
+                if (rc.senseRobotAtLocation(targetLoc).getType() == UnitType.LEVEL_ONE_PAINT_TOWER) {
+                    towers.add(targetLoc);
+                }
+                // reset target and reset built
+                builtTower = null;
+                targetLoc = null;
+            } else if (rc.canCompleteTowerPattern(goalType, targetLoc)) {
+                // Complete the ruin if we can.
                 rc.completeTowerPattern(goalType, targetLoc);
                 // yay we created
                 // now the task is to go back and refil on paint
-                task = 1;
-                // set the goal to the closest preexisting paint tower
-                goal = getClosest(rc, towers);
-
+                if (towers.size() > 0) {
+                    // stop building, set the task to refil instead
+                    task = 1;
+                    goal = getClosest(rc, towers);
+                } else {
+                    // oh no, we dont know any towers
+                    // task3 has us look for towers
+                    task = 3;
+                    // set a random goal
+                    goalCreationDate = turnCount;
+                    goal = setFarthest(rc.getLocation(), 30);
+                }
                 // if applicable add this as a new paint tower
                 if (goalType == UnitType.LEVEL_ONE_PAINT_TOWER) {
                     towers.add(targetLoc);
@@ -611,21 +659,7 @@ public class RobotPlayer {
                 // logs
                 rc.setTimelineMarker("Tower built", 0, 255, 0);
             }
-            //if another explorer built it for us
-            if(rc.canSenseRobotAtLocation(targetLoc)){
-                // yay we created
-                // now the task is to go back and refil on paint
-                task = 1;
-                // set the goal to the closest preexisting paint tower
-                goal = getClosest(rc, towers);
-                // if applicable add this as a new paint tower
-                if (rc.senseRobotAtLocation(targetLoc).getType() == UnitType.LEVEL_ONE_PAINT_TOWER) {
-                    towers.add(targetLoc);
-                }
-                // reset target and reset built
-                builtTower = null;
-                targetLoc = null;
-            }
+
         }
         // we havent set a goal
         if (goal == null) {
@@ -665,8 +699,8 @@ public class RobotPlayer {
      * loop in run(), so it is called once per turn.
      */
     public static void runMopper(RobotController rc) throws GameActionException {
-        //update the robot we're following
-        if(following!= null && rc.canSenseRobot(followingID)){
+        // update the robot we're following
+        if (following != null && rc.canSenseRobot(followingID)) {
             following = rc.senseRobot(followingID);
         }
         // if low on paint
@@ -681,15 +715,18 @@ public class RobotPlayer {
             if (rc.getLocation().isAdjacentTo(goal)) {
                 // check how much paint the tower has
                 int paint = rc.senseRobotAtLocation(goal).getPaintAmount();
-                // if its more than we need, then take the ammount we need
-                if (paint >= paintCapacity - rc.getPaint()) {
-                    rc.transferPaint(goal, -(paintCapacity - rc.getPaint()));
-                } else if (paint > 0) {
-                    // if its less than we need, take it all
-                    rc.transferPaint(goal, -paint);
+                if (rc.isActionReady()) {
+                    // if its more than we need, then take the ammount we need
+                    if (paint >= 100 - rc.getPaint()) {
+                        rc.transferPaint(goal, -(100 - rc.getPaint()));
+                    } else if (paint > 0) {
+                        // if its less than we need, take it all
+                        rc.transferPaint(goal, -paint);
+                    }
                 }
+
                 // if our paint is full
-                if (rc.getPaint() == paintCapacity) {
+                if (rc.getPaint() == 100) {
                     // goal = null means we will behave normally
                     goal = null;
                 }
