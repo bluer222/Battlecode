@@ -200,9 +200,7 @@ public class RobotPlayer {
                 // This will make our code wait until the next turn, and then perform this loop
                 // again.
 
-                rc.setIndicatorString(
-                        "task: " + task + " goal: " + goal + " moving " + directionMoved + " to paint: "
-                                + paintNext.size());
+                //rc.setIndicatorString("task: " + task + " goal: " + goal + " moving " + directionMoved + " to paint: "+ paintNext.size());
 
                 Clock.yield();
             }
@@ -246,7 +244,8 @@ public class RobotPlayer {
     }
 
     // this code runs when there are enemies nearby
-    public static void attackEnemies(RobotController rc, ArrayList<RobotInfo> enemies) throws GameActionException {
+    public static void attackEnemies(RobotController rc, ArrayList<RobotInfo> enemies, boolean twoattacks)
+            throws GameActionException {
         // each turn we get one single-block attack and one multi block attack
         // if theres only one enemy just use both attacks on them
         if (enemies.size() == 1) {
@@ -256,7 +255,9 @@ public class RobotPlayer {
                 // attack
                 rc.attack(enemies.get(0).getLocation());
                 // area
-                rc.attack(null);
+                if (twoattacks) {
+                    rc.attack(null);
+                }
             }
         } else {
             // find all the locations
@@ -271,8 +272,10 @@ public class RobotPlayer {
             MapLocation closest = getClosest(rc, locations);
             if (rc.getLocation().distanceSquaredTo(closest) <= attackRange) {
                 rc.attack(closest);
-                // area
-                rc.attack(null);
+                if (twoattacks) {
+                    // area
+                    rc.attack(null);
+                }
             }
         }
     }
@@ -311,7 +314,7 @@ public class RobotPlayer {
                 enemiesNearby = true;
                 // defend ourselves
                 rc.setIndicatorString("Attacking enemies");
-                attackEnemies(rc, nearbyEnemies);
+                attackEnemies(rc, nearbyEnemies, true);
             }
 
             rc.setIndicatorString("spreading messages");
@@ -362,7 +365,7 @@ public class RobotPlayer {
 
             botQueue.add(rng.nextInt(3) + 1);
         }
-        if(botQueue.isEmpty() && rc.getMoney() > 5000 && rc.getPaint() >= 100 && isMoneyTower(rc.getType())){
+        if (botQueue.isEmpty() && rc.getMoney() > 5000 && rc.getPaint() >= 100 && isMoneyTower(rc.getType())) {
             botQueue.add(2);
         }
         if (!botQueue.isEmpty()) {
@@ -736,7 +739,10 @@ public class RobotPlayer {
                                 System.out.println("Somoene else already built tower at " + targetLoc);
 
                                 // yay we created
-
+                                // if applicable add this as a new paint tower
+                                if (isPaintTower(rc.senseRobotAtLocation(targetLoc).getType())) {
+                                    towers.add(targetLoc);
+                                }
                                 // now the task is to go back and refil on paint
                                 if (towers.size() > 0) {
                                     // stop building, set the task to refil instead
@@ -750,10 +756,7 @@ public class RobotPlayer {
                                     unoptimalMoves = 0;
                                     goal = setFarthest(rc.getLocation(), 30);
                                 }
-                                // if applicable add this as a new paint tower
-                                if (isPaintTower(rc.senseRobotAtLocation(targetLoc).getType())) {
-                                    towers.add(targetLoc);
-                                }
+
                                 // reset target and reset built
                                 builtTower = null;
                                 targetLoc = null;
@@ -779,6 +782,10 @@ public class RobotPlayer {
                                     // Complete the ruin if we can.
                                     rc.completeTowerPattern(towerType, targetLoc);
                                     // yay we created
+                                    // if applicable add this as a new paint tower
+                                    if (paintTower) {
+                                        towers.add(targetLoc);
+                                    }
                                     // now the task is to go back and refil on paint
                                     if (towers.size() > 0) {
                                         // stop building, set the task to refil instead
@@ -792,10 +799,7 @@ public class RobotPlayer {
                                         unoptimalMoves = 0;
                                         goal = setFarthest(rc.getLocation(), 30);
                                     }
-                                    // if applicable add this as a new paint tower
-                                    if (paintTower) {
-                                        towers.add(targetLoc);
-                                    }
+
                                     // reset target and set built
                                     builtTower = targetLoc;
                                     targetLoc = null;
@@ -833,17 +837,16 @@ public class RobotPlayer {
                                         i--;
                                         // we're done paiting for this turn
                                         break;
-                                    } else {
+                                    } else if (rc.isMovementReady()) {
                                         // not in range
-                                        Direction PatternTileDirection = moveTowards(rc, rc.getLocation(),
-                                                paintNext.get(i));
-                                        if (PatternTileDirection != null) {
-                                            // if moving would make it in range
-                                            if (paintNext.get(i).subtract(PatternTileDirection)
-                                                    .distanceSquaredTo(rc.getLocation()) < attackRange) {
-                                                rc.setIndicatorString("moving and painting");
+                                        Direction PatternTileDirection = rc.getLocation().directionTo(paintNext.get(i));
+                                        // if moving would make it in range
+                                        if (paintNext.get(i).subtract(PatternTileDirection)
+                                                .distanceSquaredTo(rc.getLocation()) < attackRange) {
+                                            rc.setIndicatorString("moving and painting");
 
-                                                // move twards
+                                            // move twards
+                                            if (rc.canMove(PatternTileDirection)) {
                                                 rc.move(PatternTileDirection);
                                                 // now its within range so paint it
                                                 rc.attack(paintNext.get(i), useSecondaryColor);
@@ -853,12 +856,8 @@ public class RobotPlayer {
                                                 // we're done paiting for this turn
                                                 break;
                                             }
-                                        } else {
-                                            // this tile is outside sensing range, correctly painted, or too far, remove
-                                            // it
-                                            paintNext.remove(i);
-                                            i--;
                                         }
+
                                     }
                                 } else {
                                     // this tile is outside sensing range, correctly painted, or too far, remove
@@ -909,6 +908,7 @@ public class RobotPlayer {
                     unoptimalMoves += 1;
                 }
             } else {
+                rc.setIndicatorString("at destination " + task + " ");
                 // we are already at destination
                 unoptimalMoves = 10;
             }
@@ -922,6 +922,13 @@ public class RobotPlayer {
 
                 unoptimalMoves = 0;
                 goal = setFarthest(rc.getLocation(), 30);
+            }
+        }
+        // if we did everything and still have not doen an action
+        if (rc.isActionReady() && rc.getPaint() > 75) {
+            bots nearbyBots = findNearbyBots(rc);
+            if (nearbyBots.enemies.size() > 0) {
+                attackEnemies(rc, nearbyBots.enemies, false);
             }
         }
     }
@@ -1021,40 +1028,47 @@ public class RobotPlayer {
                 }
             }
             // once every 2 turns
-            if (turnCount % 2 == 0 && tileToClear == null) {
+            if (turnCount % 2 == 0 && paintNext.size() == 0) {
                 // sense nearby tiles
                 for (MapInfo patternTile : rc.senseNearbyMapInfos()) {
-                    // if it has a mark and is enemy
-                    if (patternTile.getMark() != PaintType.EMPTY && patternTile.getPaint().isEnemy()) {
-                        rc.setIndicatorString("founed tile need to clear");
-                        tileToClear = patternTile.getMapLocation();
+                    // if is enemy
+                    if (patternTile.getPaint().isEnemy()) {
 
+                        paintNext.add(patternTile.getMapLocation());
                     }
                 }
 
             }
-            if (tileToClear != null) {
-                if (rc.getLocation().isAdjacentTo(tileToClear)) {
-                    // mop it
-                    if (rc.canAttack(tileToClear)) {
-                        rc.attack(tileToClear);
-                        tileToClear = null;
-                    }
-                } else {
-                    // if too far then move twards it
-                    Direction dir = moveTowards(rc, rc.getLocation(), tileToClear);
-                    if (dir != null) {
-                        rc.move(dir);
-                    }
-                    // check if we're close enough now
+            if (paintNext.size() > 0) {
+                boolean moved = false;
+                for (int i = 0; i < paintNext.size(); i++) {
+                    MapLocation tileToClear = paintNext.get(i);
                     if (rc.getLocation().isAdjacentTo(tileToClear)) {
                         // mop it
                         if (rc.canAttack(tileToClear)) {
                             rc.attack(tileToClear);
-                            tileToClear = null;
+                            paintNext.remove(i);
+                            break;
+                        }
+                    } else if (!moved) {
+                        // if too far then move twards it
+                        Direction dir = moveTowards(rc, rc.getLocation(), tileToClear);
+                        if (dir != null) {
+                            rc.move(dir);
+                        }
+                        moved = true;
+                        // check if we're close enough now
+                        if (rc.getLocation().isAdjacentTo(tileToClear)) {
+                            // mop it
+                            if (rc.canAttack(tileToClear)) {
+                                rc.attack(tileToClear);
+                                paintNext.remove(i);
+                                break;
+                            }
                         }
                     }
                 }
+
             } else {
                 if (following != null) {
                     // if nothing to clear then follow
@@ -1093,6 +1107,7 @@ public class RobotPlayer {
         return unit == UnitType.LEVEL_ONE_PAINT_TOWER || unit == UnitType.LEVEL_TWO_PAINT_TOWER
                 || unit == UnitType.LEVEL_THREE_PAINT_TOWER;
     }
+
     public static boolean isMoneyTower(UnitType unit) {
         return unit == UnitType.LEVEL_ONE_MONEY_TOWER || unit == UnitType.LEVEL_TWO_MONEY_TOWER
                 || unit == UnitType.LEVEL_THREE_MONEY_TOWER;

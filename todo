@@ -1,5 +1,4 @@
-
-
+fix issue where we arrive at the desitnation and then just sit there
 Types:
 soliders:
 soliders can be explorers/builders, goes out until find ruin or enemy tower, if enemy tower go back and report, if ruin then calculate, if we can build this and still make it back we should, we can also tell splashers to claim a line from a known tower to that one, if we cant we should go back, replenish, then build it(should we ask other builders to come too?, idk)
